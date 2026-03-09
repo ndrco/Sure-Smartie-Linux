@@ -77,6 +77,12 @@ void SerialPort::open() {
 
 void SerialPort::close() {
   if (fd_ >= 0) {
+    while (::tcdrain(fd_) != 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      break;
+    }
     ::close(fd_);
     fd_ = -1;
   }
