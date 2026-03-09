@@ -27,7 +27,18 @@ std::filesystem::path defaultConfigPath() {
   }
 
 #ifdef SURE_SMARTIE_DEFAULT_CONFIG_PATH
-  return SURE_SMARTIE_DEFAULT_CONFIG_PATH;
+  const std::filesystem::path installed_config{SURE_SMARTIE_DEFAULT_CONFIG_PATH};
+  if (std::filesystem::exists(installed_config)) {
+    return installed_config;
+  }
+
+  const std::filesystem::path installed_example =
+      installed_config.string() + ".example";
+  if (std::filesystem::exists(installed_example)) {
+    return installed_example;
+  }
+
+  return installed_config;
 #else
   return "/etc/sure-smartie-linux/config.json";
 #endif

@@ -11,7 +11,9 @@ if [ -f "$ENV_FILE" ]; then
   . "$ENV_FILE"
 fi
 
-export SURE_SMARTIE_CONFIG="${SURE_SMARTIE_CONFIG:-@CMAKE_INSTALL_FULL_SYSCONFDIR@/sure-smartie-linux/config.json}"
+if [ "${SURE_SMARTIE_CONFIG+x}" = "x" ]; then
+  export SURE_SMARTIE_CONFIG
+fi
 if [ "${SURE_SMARTIE_LOG_LEVEL+x}" = "x" ]; then
   export SURE_SMARTIE_LOG_LEVEL
 fi

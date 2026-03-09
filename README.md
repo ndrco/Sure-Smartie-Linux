@@ -154,11 +154,15 @@ Typical flow:
 
 ```bash
 sudo cmake --install build
-sudo cp /usr/local/etc/sure-smartie-linux/config.json.example /usr/local/etc/sure-smartie-linux/config.json
 sudo systemctl daemon-reload
 sudo systemd-sysusers /usr/local/lib/sysusers.d/sure-smartie-linux.conf
 sudo systemctl enable --now sure-smartie-linux
 ```
+
+The runtime first looks for `/usr/local/etc/sure-smartie-linux/config.json`.
+If that file is absent, it automatically falls back to
+`/usr/local/etc/sure-smartie-linux/config.json.example`, so a fresh install still
+works before you create a custom config.
 
 If the service should run without root, ensure the selected user has access to the
 serial device, usually through the `dialout` group.
