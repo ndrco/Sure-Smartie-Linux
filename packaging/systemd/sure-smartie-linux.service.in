@@ -5,6 +5,14 @@ After=network-online.target
 
 [Service]
 Type=simple
+User=@SURE_SMARTIE_SERVICE_USER@
+Group=@SURE_SMARTIE_SERVICE_GROUP@
+SupplementaryGroups=@SURE_SMARTIE_SERIAL_GROUP@
+StateDirectory=sure-smartie-linux
+LogsDirectory=sure-smartie-linux
+WorkingDirectory=/var/lib/sure-smartie-linux
+StandardOutput=journal
+StandardError=journal
 ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/sure-smartie-linux --config @CMAKE_INSTALL_FULL_SYSCONFDIR@/sure-smartie-linux/config.json
 Restart=on-failure
 RestartSec=2

@@ -7,6 +7,7 @@
 #include <thread>
 
 #include "sure_smartie/display/DisplayFactory.hpp"
+#include "sure_smartie/core/Logger.hpp"
 #include "sure_smartie/plugins/PluginLoader.hpp"
 #include "sure_smartie/providers/BuiltinProviderFactory.hpp"
 #include "sure_smartie/providers/IProvider.hpp"
@@ -49,8 +50,14 @@ MetricMap App::collectMetrics() {
     try {
       provider->collect(metrics);
     } catch (const std::exception& error) {
-      std::cerr << "provider '" << provider->name()
-                << "' failed: " << error.what() << '\n';
+      logMessage(
+          LogLevel::warn,
+          "provider",
+          "provider collection failed",
+          {
+              {"provider", provider->name()},
+              {"error", error.what()},
+          });
       metrics["provider." + provider->name() + ".status"] = "error";
     }
   }
@@ -76,17 +83,32 @@ int App::run() {
   try {
     if (options_.once) {
       renderOnce();
+      logMessage(LogLevel::info, "app", "single render completed");
       g_stop_requested = nullptr;
       std::signal(SIGINT, previous_handler);
       return 0;
     }
+
+    logMessage(
+        LogLevel::info,
+        "app",
+        "entering render loop",
+        {
+            {"refresh_ms", std::to_string(config_.refresh_interval.count())},
+            {"providers", std::to_string(providers_.size())},
+            {"screens", std::to_string(config_.screens.size())},
+        });
 
     auto next_tick = std::chrono::steady_clock::now();
     while (!stop_requested_.load()) {
       try {
         renderOnce();
       } catch (const std::exception& error) {
-        std::cerr << "render cycle failed: " << error.what() << '\n';
+        logMessage(
+            LogLevel::error,
+            "app",
+            "render cycle failed",
+            {{"error", error.what()}});
       }
 
       next_tick += config_.refresh_interval;
@@ -103,6 +125,7 @@ int App::run() {
     throw;
   }
 
+  logMessage(LogLevel::info, "app", "stopping render loop");
   g_stop_requested = nullptr;
   std::signal(SIGINT, previous_handler);
   return 0;

@@ -8,11 +8,20 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(CTest)
+include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
 option(SURE_SMARTIE_BUILD_TESTS "Build smoke tests" ON)
 set(SURE_SMARTIE_SYSTEMD_UNIT_DIR "lib/systemd/system" CACHE STRING
     "Install directory for systemd unit files")
+set(SURE_SMARTIE_SYSUSERS_DIR "${CMAKE_INSTALL_LIBDIR}/sysusers.d" CACHE STRING
+    "Install directory for sysusers.d files")
+set(SURE_SMARTIE_SERVICE_USER "_sure-smartie" CACHE STRING
+    "User for the systemd service")
+set(SURE_SMARTIE_SERVICE_GROUP "_sure-smartie" CACHE STRING
+    "Primary group for the systemd service")
+set(SURE_SMARTIE_SERIAL_GROUP "dialout" CACHE STRING
+    "Supplementary group that grants serial device access")
 
 find_package(Threads REQUIRED)
 
@@ -22,11 +31,24 @@ configure_file(
   @ONLY
 )
 
+configure_package_config_file(
+  cmake/SureSmartieLinuxConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/SureSmartieLinuxConfig.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SureSmartieLinux
+)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/SureSmartieLinuxConfigVersion.cmake
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+
 add_library(
   sure_smartie_core
   STATIC
   src/core/App.cpp
   src/core/Config.cpp
+  src/core/Logger.cpp
   src/display/DisplayFactory.cpp
   src/display/StdoutDisplayDriver.cpp
   src/display/SureDisplayDriver.cpp
@@ -41,6 +63,15 @@ add_library(
   providers/RamProvider.cpp
   providers/SystemProvider.cpp
 )
+
+add_library(sure_smartie_plugin_sdk INTERFACE)
+target_include_directories(
+  sure_smartie_plugin_sdk
+  INTERFACE
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_compile_features(sure_smartie_plugin_sdk INTERFACE cxx_std_20)
 
 target_include_directories(
   sure_smartie_core
@@ -66,6 +97,11 @@ target_compile_options(
 
 add_executable(sure-smartie-linux src/main.cpp)
 target_link_libraries(sure-smartie-linux PRIVATE sure_smartie_core)
+target_compile_definitions(
+  sure-smartie-linux
+  PRIVATE
+    SURE_SMARTIE_DEFAULT_CONFIG_PATH="${CMAKE_INSTALL_FULL_SYSCONFDIR}/sure-smartie-linux/config.json"
+)
 
 add_library(
   sure_smartie_demo_plugin
@@ -88,8 +124,16 @@ set_target_properties(sure_smartie_demo_plugin PROPERTIES PREFIX "")
 
 install(TARGETS sure-smartie-linux RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(
+  TARGETS sure_smartie_plugin_sdk
+  EXPORT SureSmartieLinuxPluginSDKTargets
+)
+install(
   TARGETS sure_smartie_demo_plugin
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/sure-smartie-linux/plugins
+)
+install(
+  DIRECTORY include/sure_smartie
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 install(
   FILES
@@ -105,8 +149,28 @@ install(
   DESTINATION ${CMAKE_INSTALL_DATADIR}/sure-smartie-linux/examples
 )
 install(
+  DIRECTORY sdk/example-plugin/
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/sure-smartie-linux/sdk/example-plugin
+)
+install(
   FILES ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-linux.service
   DESTINATION ${SURE_SMARTIE_SYSTEMD_UNIT_DIR}
+)
+install(
+  FILES packaging/sysusers/sure-smartie-linux.conf
+  DESTINATION ${SURE_SMARTIE_SYSUSERS_DIR}
+)
+install(
+  EXPORT SureSmartieLinuxPluginSDKTargets
+  FILE SureSmartieLinuxPluginSDKTargets.cmake
+  NAMESPACE SureSmartieLinux::
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SureSmartieLinux
+)
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/SureSmartieLinuxConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/SureSmartieLinuxConfigVersion.cmake
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/SureSmartieLinux
 )
 
 if(BUILD_TESTING AND SURE_SMARTIE_BUILD_TESTS)

@@ -20,6 +20,12 @@ Phase 2 extends that baseline with:
 - pseudo-graphics bars via custom LCD characters
 - dynamic `.so` providers through `dlopen`
 
+Phase 3 adds deployment hardening:
+
+- installable systemd service and sysusers fragments
+- journald-friendly structured logging
+- installable CMake-based plugin SDK for external providers
+
 ## Repository layout
 
 ```text
@@ -92,9 +98,17 @@ Override the serial device at runtime:
 ./build/sure-smartie-linux --config configs/sure-example.json --device /dev/serial/by-id/your-display
 ```
 
+Set log verbosity:
+
+```bash
+./build/sure-smartie-linux --config configs/sure-example.json --log-level debug
+```
+
 ## systemd
 
 The install step generates and installs `sure-smartie-linux.service`.
+It also installs `sure-smartie-linux.conf` into `sysusers.d`, which creates the
+`_sure-smartie` service user and adds it to `dialout`.
 
 Typical flow:
 
@@ -102,11 +116,18 @@ Typical flow:
 sudo cmake --install build
 sudo cp /usr/local/etc/sure-smartie-linux/config.json.example /usr/local/etc/sure-smartie-linux/config.json
 sudo systemctl daemon-reload
+sudo systemd-sysusers /usr/local/lib/sysusers.d/sure-smartie-linux.conf
 sudo systemctl enable --now sure-smartie-linux
 ```
 
 If the service should run without root, ensure the selected user has access to the
 serial device, usually through the `dialout` group.
+
+The service logs clean single-line entries that work well with journald, for example:
+
+```text
+level=info component=app msg="entering render loop" refresh_ms="1000" providers="5" screens="2"
+```
 
 ## Config example
 
@@ -155,3 +176,18 @@ The template engine also supports bar macros:
 
 - `{bar:cpu.load,6}` renders a 6-cell bar for values in the default range `0..100`
 - `{bar:gpu.mem_percent,8,100}` renders a bar with an explicit max value
+
+## Plugin SDK
+
+After install, external plugins can use:
+
+```cmake
+find_package(SureSmartieLinux CONFIG REQUIRED)
+target_link_libraries(your_plugin PRIVATE SureSmartieLinux::sure_smartie_plugin_sdk)
+```
+
+A complete example project is installed to:
+
+```text
+/usr/local/share/sure-smartie-linux/sdk/example-plugin
+```

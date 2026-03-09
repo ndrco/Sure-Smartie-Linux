@@ -7,6 +7,7 @@
 
 #include "sure_smartie/core/App.hpp"
 #include "sure_smartie/core/Config.hpp"
+#include "sure_smartie/core/Logger.hpp"
 
 namespace {
 
@@ -21,7 +22,19 @@ std::filesystem::path defaultConfigPath() {
     return local_example;
   }
 
+#ifdef SURE_SMARTIE_DEFAULT_CONFIG_PATH
+  return SURE_SMARTIE_DEFAULT_CONFIG_PATH;
+#else
   return "/etc/sure-smartie-linux/config.json";
+#endif
+}
+
+void configureLoggingFromEnvironment() {
+  if (const char* level_env = std::getenv("SURE_SMARTIE_LOG_LEVEL");
+      level_env != nullptr && *level_env != '\0') {
+    sure_smartie::core::setLogLevel(
+        sure_smartie::core::parseLogLevel(level_env));
+  }
 }
 
 void printConfigSummary(const sure_smartie::core::AppConfig& config) {
@@ -37,7 +50,7 @@ void printConfigSummary(const sure_smartie::core::AppConfig& config) {
 void printUsage(const char* program_name) {
   std::cout << "Usage: " << program_name
             << " [--config <path>] [--device <path>] [--once] [--stdout]"
-               " [--validate-config]\n";
+               " [--validate-config] [--log-level <trace|debug|info|warn|error>]\n";
 }
 
 }  // namespace
@@ -48,6 +61,8 @@ int main(int argc, char** argv) {
   sure_smartie::core::RuntimeOptions options;
 
   try {
+    configureLoggingFromEnvironment();
+
     for (int index = 1; index < argc; ++index) {
       const std::string_view arg{argv[index]};
 
@@ -82,6 +97,15 @@ int main(int argc, char** argv) {
         continue;
       }
 
+      if (arg == "--log-level") {
+        if (index + 1 >= argc) {
+          throw std::invalid_argument("--log-level requires a value");
+        }
+        sure_smartie::core::setLogLevel(
+            sure_smartie::core::parseLogLevel(argv[++index]));
+        continue;
+      }
+
       if (arg == "--help" || arg == "-h") {
         printUsage(argv[0]);
         return 0;
@@ -99,10 +123,25 @@ int main(int argc, char** argv) {
       return 0;
     }
 
+    sure_smartie::core::logMessage(
+        sure_smartie::core::LogLevel::info,
+        "main",
+        "starting application",
+        {
+            {"config", config_path.string()},
+            {"device", config.device},
+            {"display", config.display.type},
+            {"once", options.once ? "true" : "false"},
+        });
+
     sure_smartie::core::App app(std::move(config), options);
     return app.run();
   } catch (const std::exception& error) {
-    std::cerr << "fatal: " << error.what() << '\n';
+    sure_smartie::core::logMessage(
+        sure_smartie::core::LogLevel::error,
+        "main",
+        "fatal error",
+        {{"error", error.what()}});
     printUsage(argv[0]);
     return 1;
   }
