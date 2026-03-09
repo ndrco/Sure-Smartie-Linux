@@ -61,6 +61,7 @@ void SerialPort::open() {
   settings.c_cflag = (settings.c_cflag & ~CSIZE) | CS8;
   settings.c_cflag |= CLOCAL | CREAD;
   settings.c_cflag &= ~(PARENB | PARODD | CSTOPB | CRTSCTS);
+  settings.c_cflag &= ~HUPCL;
   settings.c_iflag &= ~(IXON | IXOFF | IXANY);
   settings.c_cc[VMIN] = 0;
   settings.c_cc[VTIME] = 5;

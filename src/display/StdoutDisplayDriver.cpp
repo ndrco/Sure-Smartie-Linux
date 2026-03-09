@@ -50,6 +50,8 @@ void StdoutDisplayDriver::render(const core::Frame& frame) {
   }
 }
 
+void StdoutDisplayDriver::release() {}
+
 void StdoutDisplayDriver::setBacklight([[maybe_unused]] bool on) {}
 
 void StdoutDisplayDriver::setContrast([[maybe_unused]] std::uint8_t value) {}

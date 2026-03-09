@@ -44,11 +44,14 @@ SureDisplayDriver::SureDisplayDriver(std::string device,
 core::DisplayGeometry SureDisplayDriver::geometry() const { return geometry_; }
 
 void SureDisplayDriver::initialize() {
-  if (initialized_) {
+  if (serial_.isOpen()) {
     return;
   }
 
   serial_.open();
+  if (initialized_) {
+    return;
+  }
   std::this_thread::sleep_for(std::chrono::milliseconds{200});
 
   // Match the known-good Python probe sequence first.
@@ -69,6 +72,8 @@ void SureDisplayDriver::render(const core::Frame& frame) {
     writeLine(row + 1, row < frame.size() ? frame[row] : "");
   }
 }
+
+void SureDisplayDriver::release() { serial_.close(); }
 
 void SureDisplayDriver::setBacklight(bool on) {
   if (!serial_.isOpen()) {

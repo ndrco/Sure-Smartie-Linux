@@ -123,7 +123,13 @@ int App::run() {
 
   try {
     if (options_.once) {
-      renderOnce();
+      try {
+        renderOnce();
+      } catch (...) {
+        display_->release();
+        throw;
+      }
+      display_->release();
       logMessage(LogLevel::info, "app", "single render completed");
       g_stop_requested = nullptr;
       std::signal(SIGINT, previous_handler);
@@ -151,6 +157,8 @@ int App::run() {
             "render cycle failed",
             {{"error", error.what()}});
       }
+
+      display_->release();
 
       next_tick += refresh_interval;
       std::this_thread::sleep_until(next_tick);

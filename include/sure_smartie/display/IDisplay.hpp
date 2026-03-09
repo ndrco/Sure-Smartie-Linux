@@ -14,6 +14,7 @@ class IDisplay {
   virtual core::DisplayGeometry geometry() const = 0;
   virtual void initialize() = 0;
   virtual void render(const core::Frame& frame) = 0;
+  virtual void release() = 0;
   virtual void setBacklight(bool on) = 0;
   virtual void setContrast(std::uint8_t value) = 0;
   virtual void setBrightness(std::uint8_t value) = 0;

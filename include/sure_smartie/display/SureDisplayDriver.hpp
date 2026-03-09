@@ -21,6 +21,7 @@ class SureDisplayDriver : public IDisplay {
   core::DisplayGeometry geometry() const override;
   void initialize() override;
   void render(const core::Frame& frame) override;
+  void release() override;
   void setBacklight(bool on) override;
   void setContrast(std::uint8_t value) override;
   void setBrightness(std::uint8_t value) override;
