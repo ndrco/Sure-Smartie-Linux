@@ -17,8 +17,18 @@ set(SURE_SMARTIE_SYSTEMD_UNIT_DIR "lib/systemd/system" CACHE STRING
     "Install directory for systemd unit files")
 set(SURE_SMARTIE_SYSUSERS_DIR "${CMAKE_INSTALL_LIBDIR}/sysusers.d" CACHE STRING
     "Install directory for sysusers.d files")
-set(SURE_SMARTIE_SYSTEM_SLEEP_DIR "lib/systemd/system-sleep" CACHE STRING
-    "Install directory for systemd sleep hooks")
+set(_sure_smartie_system_sleep_dir_default "/usr/lib/systemd/system-sleep")
+if(NOT DEFINED SURE_SMARTIE_SYSTEM_SLEEP_DIR
+   OR SURE_SMARTIE_SYSTEM_SLEEP_DIR STREQUAL "lib/systemd/system-sleep"
+   OR SURE_SMARTIE_SYSTEM_SLEEP_DIR STREQUAL "${CMAKE_INSTALL_LIBDIR}/systemd/system-sleep"
+   OR SURE_SMARTIE_SYSTEM_SLEEP_DIR STREQUAL "/usr/local/lib/systemd/system-sleep")
+  set(SURE_SMARTIE_SYSTEM_SLEEP_DIR "${_sure_smartie_system_sleep_dir_default}" CACHE STRING
+      "Install directory for systemd sleep hooks" FORCE)
+else()
+  set(SURE_SMARTIE_SYSTEM_SLEEP_DIR "${SURE_SMARTIE_SYSTEM_SLEEP_DIR}" CACHE STRING
+      "Install directory for systemd sleep hooks")
+endif()
+unset(_sure_smartie_system_sleep_dir_default)
 set(SURE_SMARTIE_SERVICE_USER "_sure-smartie" CACHE STRING
     "User for the systemd service")
 set(SURE_SMARTIE_SERVICE_GROUP "_sure-smartie" CACHE STRING

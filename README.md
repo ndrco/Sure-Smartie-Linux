@@ -148,7 +148,7 @@ It also installs `sure-smartie-linux.conf` into `sysusers.d`, which creates the
 It also installs:
 
 - `/usr/local/etc/default/sure-smartie-linux` as a shared environment file
-- `/usr/local/lib/systemd/system-sleep/sure-smartie-linux` as a suspend/resume hook
+- `/usr/lib/systemd/system-sleep/sure-smartie-linux` as a suspend/resume hook
 
 Typical flow:
 
