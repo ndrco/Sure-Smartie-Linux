@@ -11,6 +11,11 @@ if [ -f "$ENV_FILE" ]; then
   . "$ENV_FILE"
 fi
 
+export SURE_SMARTIE_CONFIG="${SURE_SMARTIE_CONFIG:-@CMAKE_INSTALL_FULL_SYSCONFDIR@/sure-smartie-linux/config.json}"
+if [ "${SURE_SMARTIE_LOG_LEVEL+x}" = "x" ]; then
+  export SURE_SMARTIE_LOG_LEVEL
+fi
+
 freeze_service() {
   if command -v systemctl >/dev/null 2>&1; then
     if systemctl is-active --quiet "$SERVICE_NAME"; then

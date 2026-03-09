@@ -42,6 +42,12 @@ configure_file(
   @ONLY
 )
 
+configure_file(
+  packaging/systemd/sure-smartie-linux.env.in
+  ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-linux.env
+  @ONLY
+)
+
 configure_package_config_file(
   cmake/SureSmartieLinuxConfig.cmake.in
   ${CMAKE_CURRENT_BINARY_DIR}/SureSmartieLinuxConfig.cmake
@@ -235,7 +241,7 @@ install(
   DESTINATION ${SURE_SMARTIE_SYSUSERS_DIR}
 )
 install(
-  FILES packaging/systemd/sure-smartie-linux.env
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-linux.env
   DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/default
   RENAME sure-smartie-linux
 )
