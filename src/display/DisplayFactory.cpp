@@ -10,10 +10,7 @@ namespace sure_smartie::display {
 
 std::unique_ptr<IDisplay> createDisplay(const core::AppConfig& config,
                                         const core::RuntimeOptions& options) {
-  const core::DisplayGeometry geometry{
-      .cols = config.display.cols,
-      .rows = config.display.rows,
-  };
+  const core::DisplayGeometry geometry = core::normalizedGeometry(config.display);
 
   if (options.force_stdout_display || config.display.type == "stdout") {
     return std::make_unique<StdoutDisplayDriver>(geometry);

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <iterator>
 #include <thread>
+#include <unordered_set>
 
 #include "sure_smartie/display/DisplayFactory.hpp"
 #include "sure_smartie/core/Logger.hpp"
@@ -17,6 +18,11 @@ namespace {
 
 std::atomic_bool* g_stop_requested = nullptr;
 
+std::chrono::milliseconds normalizedRefreshInterval(
+    std::chrono::milliseconds interval) {
+  return std::max(interval, std::chrono::milliseconds{100});
+}
+
 void onSignal([[maybe_unused]] int signal) {
   if (g_stop_requested != nullptr) {
     g_stop_requested->store(true);
@@ -25,12 +31,46 @@ void onSignal([[maybe_unused]] int signal) {
 
 std::vector<std::unique_ptr<providers::IProvider>> createProviders(
     const AppConfig& config) {
-  auto providers = providers::createBuiltinProviders(config.providers);
-  auto plugin_providers = plugins::loadProviderPlugins(config.plugin_paths);
+  std::vector<std::unique_ptr<providers::IProvider>> providers;
+  std::unordered_set<std::string> seen_builtin;
 
-  providers.insert(providers.end(),
-                   std::make_move_iterator(plugin_providers.begin()),
-                   std::make_move_iterator(plugin_providers.end()));
+  for (const auto& provider_name : config.providers) {
+    if (!seen_builtin.insert(provider_name).second) {
+      continue;
+    }
+
+    try {
+      providers.push_back(providers::createBuiltinProvider(provider_name));
+    } catch (const std::exception& error) {
+      logMessage(
+          LogLevel::warn,
+          "provider",
+          "provider initialization failed",
+          {
+              {"provider", provider_name},
+              {"error", error.what()},
+          });
+    }
+  }
+
+  for (const auto& plugin_path : config.plugin_paths) {
+    try {
+      auto plugin_providers = plugins::loadProviderPlugins({plugin_path});
+      providers.insert(providers.end(),
+                       std::make_move_iterator(plugin_providers.begin()),
+                       std::make_move_iterator(plugin_providers.end()));
+    } catch (const std::exception& error) {
+      logMessage(
+          LogLevel::warn,
+          "plugin",
+          "plugin loading failed",
+          {
+              {"path", plugin_path},
+              {"error", error.what()},
+          });
+    }
+  }
+
   return providers;
 }
 
@@ -79,6 +119,7 @@ void App::renderOnce() {
 int App::run() {
   const auto previous_handler = std::signal(SIGINT, onSignal);
   g_stop_requested = &stop_requested_;
+  const auto refresh_interval = normalizedRefreshInterval(config_.refresh_interval);
 
   try {
     if (options_.once) {
@@ -94,7 +135,7 @@ int App::run() {
         "app",
         "entering render loop",
         {
-            {"refresh_ms", std::to_string(config_.refresh_interval.count())},
+            {"refresh_ms", std::to_string(refresh_interval.count())},
             {"providers", std::to_string(providers_.size())},
             {"screens", std::to_string(config_.screens.size())},
         });
@@ -111,11 +152,11 @@ int App::run() {
             {{"error", error.what()}});
       }
 
-      next_tick += config_.refresh_interval;
+      next_tick += refresh_interval;
       std::this_thread::sleep_until(next_tick);
 
       const auto now = std::chrono::steady_clock::now();
-      if (now - next_tick > config_.refresh_interval) {
+      if (now - next_tick > refresh_interval) {
         next_tick = now;
       }
     }

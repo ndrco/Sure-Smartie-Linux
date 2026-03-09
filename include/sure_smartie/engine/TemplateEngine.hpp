@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "sure_smartie/core/Types.hpp"
@@ -13,6 +14,7 @@ class TemplateEngine {
                      const core::DisplayGeometry& geometry) const;
 
   static std::string fitToWidth(std::string text, std::size_t width);
+  static std::optional<std::size_t> estimateRenderedWidth(const std::string& line);
 
  private:
   static std::string renderBar(const std::string& metric_key,

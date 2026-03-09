@@ -2,8 +2,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cmath>
-#include <sstream>
+#include <optional>
 
 namespace sure_smartie::engine {
 namespace {
@@ -42,6 +43,18 @@ std::optional<double> parseNumber(const std::string& value) {
   }
 }
 
+std::optional<int> parseInt(const std::string& value) {
+  int parsed = 0;
+  const auto trimmed = trim(value);
+  const auto* begin = trimmed.data();
+  const auto* end = trimmed.data() + trimmed.size();
+  const auto result = std::from_chars(begin, end, parsed);
+  if (result.ec != std::errc{} || result.ptr != end) {
+    return std::nullopt;
+  }
+  return parsed;
+}
+
 }  // namespace
 
 core::Frame TemplateEngine::render(const core::ScreenDefinition& screen,
@@ -74,6 +87,52 @@ std::string TemplateEngine::fitToWidth(std::string text, std::size_t width) {
   }
 
   return text;
+}
+
+std::optional<std::size_t> TemplateEngine::estimateRenderedWidth(
+    const std::string& line) {
+  std::size_t width = 0;
+
+  for (std::size_t index = 0; index < line.size(); ++index) {
+    if (line[index] != '{') {
+      ++width;
+      continue;
+    }
+
+    const auto end = line.find('}', index + 1);
+    if (end == std::string::npos) {
+      return std::nullopt;
+    }
+
+    const auto key = line.substr(index + 1, end - index - 1);
+    if (key.rfind("bar:", 0) == 0) {
+      const auto arguments = split(key.substr(4), ',');
+      if (arguments.size() < 2 || arguments.size() > 3) {
+        return std::nullopt;
+      }
+
+      const auto metric_key = trim(arguments[0]);
+      const auto bar_width = parseInt(arguments[1]);
+      const auto max_value = arguments.size() > 2
+                                 ? parseNumber(trim(arguments[2]))
+                                 : std::optional<double>{100.0};
+
+      if (metric_key.empty() || !bar_width.has_value() || *bar_width <= 0 ||
+          !max_value.has_value() || *max_value <= 0.0) {
+        return std::nullopt;
+      }
+
+      width += static_cast<std::size_t>(*bar_width);
+    } else if (key.empty()) {
+      return std::nullopt;
+    } else {
+      width += 1;
+    }
+
+    index = end;
+  }
+
+  return width;
 }
 
 std::string TemplateEngine::renderBar(const std::string& metric_key,
@@ -126,19 +185,32 @@ std::string TemplateEngine::renderLine(const std::string& line,
     const auto key = line.substr(index + 1, end - index - 1);
     if (key.rfind("bar:", 0) == 0) {
       const auto arguments = split(key.substr(4), ',');
-      const auto metric_key =
-          arguments.empty() ? std::string{} : trim(arguments[0]);
-      const auto width = arguments.size() > 1
-                             ? static_cast<std::size_t>(std::max(0, std::stoi(trim(arguments[1]))))
-                             : 0U;
-      const auto max_value =
-          arguments.size() > 2 ? std::stod(trim(arguments[2])) : 100.0;
-      output.append(renderBar(metric_key, width, max_value, metrics));
+      std::string replacement = "-";
+
+      if (arguments.size() >= 2 && arguments.size() <= 3) {
+        const auto metric_key =
+            arguments.empty() ? std::string{} : trim(arguments[0]);
+        const auto width = parseInt(arguments[1]);
+        const auto max_value = arguments.size() > 2
+                                   ? parseNumber(trim(arguments[2]))
+                                   : std::optional<double>{100.0};
+
+        if (!metric_key.empty() && width.has_value() && *width > 0 &&
+            max_value.has_value() && *max_value > 0.0) {
+          replacement = renderBar(
+              metric_key,
+              static_cast<std::size_t>(*width),
+              *max_value,
+              metrics);
+        }
+      }
+
+      output.append(replacement);
       index = end;
       continue;
     }
 
-    const auto metric = metrics.find(key);
+    const auto metric = metrics.find(trim(key));
     output.append(metric != metrics.end() ? metric->second : "-");
     index = end;
   }

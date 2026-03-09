@@ -15,8 +15,8 @@ class SureDisplayDriver : public IDisplay {
                     int baudrate,
                     core::DisplayGeometry geometry,
                     bool backlight,
-                    std::uint8_t contrast,
-                    std::uint8_t brightness);
+                    int contrast,
+                    int brightness);
 
   core::DisplayGeometry geometry() const override;
   void initialize() override;

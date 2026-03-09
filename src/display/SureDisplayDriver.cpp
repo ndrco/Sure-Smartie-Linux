@@ -9,7 +9,7 @@
 namespace sure_smartie::display {
 namespace {
 
-std::uint8_t clampProtocolByte(std::uint8_t value) {
+std::uint8_t clampProtocolByte(int value) {
   return static_cast<std::uint8_t>(std::clamp<int>(value, 1, 254));
 }
 
@@ -33,8 +33,8 @@ SureDisplayDriver::SureDisplayDriver(std::string device,
                                      int baudrate,
                                      core::DisplayGeometry geometry,
                                      bool backlight,
-                                     std::uint8_t contrast,
-                                     std::uint8_t brightness)
+                                     int contrast,
+                                     int brightness)
     : serial_(std::move(device), baudrate),
       geometry_(geometry),
       backlight_(backlight),

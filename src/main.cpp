@@ -4,9 +4,11 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "sure_smartie/core/App.hpp"
 #include "sure_smartie/core/Config.hpp"
+#include "sure_smartie/core/ConfigValidator.hpp"
 #include "sure_smartie/core/Logger.hpp"
 
 namespace {
@@ -45,6 +47,45 @@ void printConfigSummary(const sure_smartie::core::AppConfig& config) {
             << "providers: " << config.providers.size() << '\n'
             << "plugins: " << config.plugin_paths.size() << '\n'
             << "screens: " << config.screens.size() << '\n';
+}
+
+std::string severityToString(
+    sure_smartie::core::DiagnosticSeverity severity) {
+  switch (severity) {
+    case sure_smartie::core::DiagnosticSeverity::info:
+      return "info";
+    case sure_smartie::core::DiagnosticSeverity::warning:
+      return "warning";
+    case sure_smartie::core::DiagnosticSeverity::error:
+      return "error";
+  }
+
+  return "unknown";
+}
+
+bool hasErrors(
+    const std::vector<sure_smartie::core::Diagnostic>& diagnostics) {
+  for (const auto& diagnostic : diagnostics) {
+    if (diagnostic.severity == sure_smartie::core::DiagnosticSeverity::error) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void printDiagnostics(
+    std::ostream& stream,
+    const std::vector<sure_smartie::core::Diagnostic>& diagnostics) {
+  if (diagnostics.empty()) {
+    stream << "validation: ok\n";
+    return;
+  }
+
+  for (const auto& diagnostic : diagnostics) {
+    stream << severityToString(diagnostic.severity) << ": "
+           << diagnostic.field_path << ": " << diagnostic.message << '\n';
+  }
 }
 
 void printUsage(const char* program_name) {
@@ -118,9 +159,19 @@ int main(int argc, char** argv) {
     if (!device_override.empty()) {
       config.device = device_override;
     }
+    const auto diagnostics =
+        sure_smartie::core::ConfigValidator::validate(config);
     if (options.validate_config_only) {
       printConfigSummary(config);
-      return 0;
+      printDiagnostics(std::cout, diagnostics);
+      return hasErrors(diagnostics) ? 1 : 0;
+    }
+
+    if (!diagnostics.empty()) {
+      printDiagnostics(std::cerr, diagnostics);
+    }
+    if (hasErrors(diagnostics)) {
+      throw std::invalid_argument("configuration validation failed");
     }
 
     sure_smartie::core::logMessage(

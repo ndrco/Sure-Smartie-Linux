@@ -1,5 +1,6 @@
 #include "sure_smartie/providers/BuiltinProviderFactory.hpp"
 
+#include <algorithm>
 #include <memory>
 #include <stdexcept>
 #include <unordered_set>
@@ -12,6 +13,39 @@
 
 namespace sure_smartie::providers {
 
+std::vector<std::string> builtinProviderNames() {
+  return {"cpu", "gpu", "ram", "system", "network"};
+}
+
+bool isBuiltinProviderName(std::string_view provider_name) {
+  const auto names = builtinProviderNames();
+  return std::find(names.begin(), names.end(), provider_name) != names.end();
+}
+
+std::unique_ptr<IProvider> createBuiltinProvider(std::string_view provider_name) {
+  if (provider_name == "cpu") {
+    return std::make_unique<CpuProvider>();
+  }
+
+  if (provider_name == "ram") {
+    return std::make_unique<RamProvider>();
+  }
+
+  if (provider_name == "gpu") {
+    return std::make_unique<GpuProvider>();
+  }
+
+  if (provider_name == "system") {
+    return std::make_unique<SystemProvider>();
+  }
+
+  if (provider_name == "network") {
+    return std::make_unique<NetworkProvider>();
+  }
+
+  throw std::invalid_argument("Unknown provider: " + std::string(provider_name));
+}
+
 std::vector<std::unique_ptr<IProvider>> createBuiltinProviders(
     const std::vector<std::string>& provider_names) {
   std::vector<std::unique_ptr<IProvider>> providers;
@@ -21,33 +55,7 @@ std::vector<std::unique_ptr<IProvider>> createBuiltinProviders(
     if (!seen.insert(provider_name).second) {
       continue;
     }
-
-    if (provider_name == "cpu") {
-      providers.push_back(std::make_unique<CpuProvider>());
-      continue;
-    }
-
-    if (provider_name == "ram") {
-      providers.push_back(std::make_unique<RamProvider>());
-      continue;
-    }
-
-    if (provider_name == "gpu") {
-      providers.push_back(std::make_unique<GpuProvider>());
-      continue;
-    }
-
-    if (provider_name == "system") {
-      providers.push_back(std::make_unique<SystemProvider>());
-      continue;
-    }
-
-    if (provider_name == "network") {
-      providers.push_back(std::make_unique<NetworkProvider>());
-      continue;
-    }
-
-    throw std::invalid_argument("Unknown provider: " + provider_name);
+    providers.push_back(createBuiltinProvider(provider_name));
   }
 
   return providers;

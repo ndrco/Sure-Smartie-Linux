@@ -26,6 +26,12 @@ Phase 3 adds deployment hardening:
 - journald-friendly structured logging
 - installable CMake-based plugin SDK for external providers
 
+Phase 4 adds a native GUI editor:
+
+- optional `Qt6 Widgets` application `sure-smartie-gui`
+- live LCD preview based on the same config, providers and template engine
+- config serialization and validation APIs shared with the CLI/runtime
+
 ## Repository layout
 
 ```text
@@ -37,6 +43,7 @@ Sure-Smartie-linux/
 ├── plugins/
 ├── providers/
 ├── src/
+│   └── gui/
 ├── tests/
 ├── Docs/
 └── Tests/
@@ -48,6 +55,16 @@ Sure-Smartie-linux/
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
+```
+
+GUI build is enabled by default through `SURE_SMARTIE_BUILD_GUI=ON`.
+If Qt6 Widgets is not available, CMake keeps building the CLI/core targets and
+prints a status message that `sure-smartie-gui` was skipped.
+
+To disable GUI explicitly:
+
+```bash
+cmake -S . -B build -DSURE_SMARTIE_BUILD_GUI=OFF
 ```
 
 ## Install
@@ -72,6 +89,18 @@ Dry-run on stdout:
 
 ```bash
 ./build/sure-smartie-linux --config configs/stdout-example.json --once
+```
+
+Run the GUI editor:
+
+```bash
+./build/sure-smartie-gui
+```
+
+Open a specific config in the GUI:
+
+```bash
+./build/sure-smartie-gui configs/sure-example.json
 ```
 
 Run against the physical display:
@@ -176,6 +205,31 @@ The template engine also supports bar macros:
 
 - `{bar:cpu.load,6}` renders a 6-cell bar for values in the default range `0..100`
 - `{bar:gpu.mem_percent,8,100}` renders a bar with an explicit max value
+
+It also exposes a width estimator that is used by both CLI validation and the GUI line
+counters, so template-heavy lines are no longer flagged just because the raw source
+string is longer than 20 characters.
+
+## GUI
+
+The GUI edits the same JSON config consumed by `sure-smartie-linux`.
+
+Current v1 capabilities:
+
+- open, save and save-as for runtime-compatible JSON configs
+- edit display settings, built-in providers, plugin paths and screen rotation data
+- live preview rendered from the shared `TemplateEngine`
+- live local metrics collected through the same built-in/plugin provider stack
+- validation panel powered by the shared `ConfigValidator`
+
+Current non-goals:
+
+- direct serial writes from the GUI
+- systemd management
+- web UI
+
+The preview widget renders the LCD frame directly and understands custom bar glyphs,
+but it never opens the physical serial device.
 
 ## Plugin SDK
 

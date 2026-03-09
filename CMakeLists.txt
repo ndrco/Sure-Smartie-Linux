@@ -12,6 +12,7 @@ include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
 option(SURE_SMARTIE_BUILD_TESTS "Build smoke tests" ON)
+option(SURE_SMARTIE_BUILD_GUI "Build Qt6 GUI" ON)
 set(SURE_SMARTIE_SYSTEMD_UNIT_DIR "lib/systemd/system" CACHE STRING
     "Install directory for systemd unit files")
 set(SURE_SMARTIE_SYSUSERS_DIR "${CMAKE_INSTALL_LIBDIR}/sysusers.d" CACHE STRING
@@ -48,7 +49,11 @@ add_library(
   STATIC
   src/core/App.cpp
   src/core/Config.cpp
+  src/core/ConfigSerializer.cpp
+  src/core/ConfigValidator.cpp
   src/core/Logger.cpp
+  src/core/MetricsSnapshotService.cpp
+  src/core/PreviewFrameRenderer.cpp
   src/display/DisplayFactory.cpp
   src/display/StdoutDisplayDriver.cpp
   src/display/SureDisplayDriver.cpp
@@ -102,6 +107,36 @@ target_compile_definitions(
   PRIVATE
     SURE_SMARTIE_DEFAULT_CONFIG_PATH="${CMAKE_INSTALL_FULL_SYSCONFDIR}/sure-smartie-linux/config.json"
 )
+
+if(SURE_SMARTIE_BUILD_GUI)
+  find_package(Qt6 COMPONENTS Core Gui Widgets QUIET)
+  if(Qt6_FOUND)
+    add_executable(
+      sure-smartie-gui
+      src/gui/LcdPreviewWidget.cpp
+      src/gui/MainWindow.cpp
+      src/gui/main.cpp
+    )
+    target_link_libraries(
+      sure-smartie-gui
+      PRIVATE
+        sure_smartie_core
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
+    )
+    target_compile_options(
+      sure-smartie-gui
+      PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+    )
+    install(TARGETS sure-smartie-gui RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  else()
+    message(STATUS "Qt6 Widgets not found; sure-smartie-gui target is disabled")
+  endif()
+endif()
 
 add_library(
   sure_smartie_demo_plugin
@@ -178,6 +213,10 @@ if(BUILD_TESTING AND SURE_SMARTIE_BUILD_TESTS)
   target_link_libraries(template_engine_smoke PRIVATE sure_smartie_core)
   add_test(NAME template_engine_smoke COMMAND template_engine_smoke)
 
+  add_executable(core_services_smoke tests/core_services_smoke.cpp)
+  target_link_libraries(core_services_smoke PRIVATE sure_smartie_core)
+  add_test(NAME core_services_smoke COMMAND core_services_smoke)
+
   add_executable(plugin_loader_smoke tests/plugin_loader_smoke.cpp)
   target_link_libraries(plugin_loader_smoke PRIVATE sure_smartie_core)
   add_test(
@@ -191,4 +230,18 @@ if(BUILD_TESTING AND SURE_SMARTIE_BUILD_TESTS)
       --config ${PROJECT_SOURCE_DIR}/configs/stdout-example.json
       --validate-config
   )
+
+  if(TARGET sure-smartie-gui)
+    add_executable(gui_smoke tests/gui_smoke.cpp)
+    target_link_libraries(
+      gui_smoke
+      PRIVATE
+        sure_smartie_core
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
+    )
+    add_test(NAME gui_smoke COMMAND gui_smoke)
+    set_tests_properties(gui_smoke PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+  endif()
 endif()

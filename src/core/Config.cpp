@@ -1,8 +1,6 @@
 #include "sure_smartie/core/Config.hpp"
 
-#include <algorithm>
 #include <fstream>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -12,28 +10,6 @@ namespace sure_smartie::core {
 namespace {
 
 using json = nlohmann::json;
-
-std::chrono::milliseconds normalizedInterval(int value_ms) {
-  return std::chrono::milliseconds(std::max(value_ms, 100));
-}
-
-std::uint8_t clampByte(int value) {
-  return static_cast<std::uint8_t>(std::clamp(value, 1, 254));
-}
-
-ScreenDefinition defaultScreen() {
-  return ScreenDefinition{
-      .name = "overview",
-      .interval = std::chrono::milliseconds{2000},
-      .lines =
-          {
-              "CPU {bar:cpu.load,6} {cpu.load}%",
-              "GPU {bar:gpu.load,6} {gpu.load}%",
-              "VRM {gpu.mem_used}/{gpu.mem_total}",
-              "{system.time} {system.hostname}",
-          },
-  };
-}
 
 }  // namespace
 
@@ -56,7 +32,7 @@ AppConfig ConfigLoader::loadFromFile(const std::filesystem::path& path) {
 
   if (document.contains("refresh_ms")) {
     config.refresh_interval =
-        normalizedInterval(document.at("refresh_ms").get<int>());
+        std::chrono::milliseconds(document.at("refresh_ms").get<int>());
   }
 
   if (document.contains("display")) {
@@ -65,19 +41,19 @@ AppConfig ConfigLoader::loadFromFile(const std::filesystem::path& path) {
       config.display.type = display.at("type").get<std::string>();
     }
     if (display.contains("cols")) {
-      config.display.cols = std::max<std::size_t>(display.at("cols").get<int>(), 1);
+      config.display.cols = display.at("cols").get<int>();
     }
     if (display.contains("rows")) {
-      config.display.rows = std::max<std::size_t>(display.at("rows").get<int>(), 1);
+      config.display.rows = display.at("rows").get<int>();
     }
     if (display.contains("backlight")) {
       config.display.backlight = display.at("backlight").get<bool>();
     }
     if (display.contains("contrast")) {
-      config.display.contrast = clampByte(display.at("contrast").get<int>());
+      config.display.contrast = display.at("contrast").get<int>();
     }
     if (display.contains("brightness")) {
-      config.display.brightness = clampByte(display.at("brightness").get<int>());
+      config.display.brightness = display.at("brightness").get<int>();
     }
   }
 
@@ -95,18 +71,14 @@ AppConfig ConfigLoader::loadFromFile(const std::filesystem::path& path) {
     for (const auto& screen_json : document.at("screens")) {
       ScreenDefinition screen;
       screen.name = screen_json.value("name", "screen");
-      screen.interval =
-          normalizedInterval(screen_json.value("interval_ms", 2000));
+      screen.interval = std::chrono::milliseconds(
+          screen_json.value("interval_ms", 2000));
       if (screen_json.contains("lines")) {
         screen.lines =
             screen_json.at("lines").get<std::vector<std::string>>();
       }
       config.screens.push_back(std::move(screen));
     }
-  }
-
-  if (config.screens.empty()) {
-    config.screens.push_back(defaultScreen());
   }
 
   return config;
