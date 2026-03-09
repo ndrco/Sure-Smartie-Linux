@@ -45,6 +45,7 @@ struct AppConfig {
 struct RuntimeOptions {
   bool once{false};
   bool force_stdout_display{false};
+  bool validate_config_only{false};
 };
 
 }  // namespace sure_smartie::core

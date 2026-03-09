@@ -8,10 +8,19 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(CTest)
+include(GNUInstallDirs)
 
 option(SURE_SMARTIE_BUILD_TESTS "Build smoke tests" ON)
+set(SURE_SMARTIE_SYSTEMD_UNIT_DIR "lib/systemd/system" CACHE STRING
+    "Install directory for systemd unit files")
 
 find_package(Threads REQUIRED)
+
+configure_file(
+  packaging/systemd/sure-smartie-linux.service.in
+  ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-linux.service
+  @ONLY
+)
 
 add_library(
   sure_smartie_core
@@ -77,6 +86,29 @@ target_compile_options(
 )
 set_target_properties(sure_smartie_demo_plugin PROPERTIES PREFIX "")
 
+install(TARGETS sure-smartie-linux RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(
+  TARGETS sure_smartie_demo_plugin
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/sure-smartie-linux/plugins
+)
+install(
+  FILES
+    configs/sure-example.json
+  DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/sure-smartie-linux
+  RENAME config.json.example
+)
+install(
+  FILES
+    configs/stdout-example.json
+    configs/plugin-example.json
+    README.md
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/sure-smartie-linux/examples
+)
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-linux.service
+  DESTINATION ${SURE_SMARTIE_SYSTEMD_UNIT_DIR}
+)
+
 if(BUILD_TESTING AND SURE_SMARTIE_BUILD_TESTS)
   add_executable(template_engine_smoke tests/template_engine_smoke.cpp)
   target_link_libraries(template_engine_smoke PRIVATE sure_smartie_core)
@@ -87,5 +119,12 @@ if(BUILD_TESTING AND SURE_SMARTIE_BUILD_TESTS)
   add_test(
     NAME plugin_loader_smoke
     COMMAND plugin_loader_smoke $<TARGET_FILE:sure_smartie_demo_plugin>
+  )
+  add_test(
+    NAME config_validation_smoke
+    COMMAND
+      $<TARGET_FILE:sure-smartie-linux>
+      --config ${PROJECT_SOURCE_DIR}/configs/stdout-example.json
+      --validate-config
   )
 endif()

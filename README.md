@@ -44,6 +44,22 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+## Install
+
+Staging install:
+
+```bash
+cmake --install build --prefix ./build/install
+```
+
+System-wide install:
+
+```bash
+sudo cmake --install build
+```
+
+By default this installs into `/usr/local`.
+
 ## Run
 
 Dry-run on stdout:
@@ -64,6 +80,34 @@ Run with the sample plugin:
 ./build/sure-smartie-linux --config configs/plugin-example.json --once
 ```
 
+Validate a config without starting the render loop:
+
+```bash
+./build/sure-smartie-linux --config configs/sure-example.json --validate-config
+```
+
+Override the serial device at runtime:
+
+```bash
+./build/sure-smartie-linux --config configs/sure-example.json --device /dev/serial/by-id/your-display
+```
+
+## systemd
+
+The install step generates and installs `sure-smartie-linux.service`.
+
+Typical flow:
+
+```bash
+sudo cmake --install build
+sudo cp /usr/local/etc/sure-smartie-linux/config.json.example /usr/local/etc/sure-smartie-linux/config.json
+sudo systemctl daemon-reload
+sudo systemctl enable --now sure-smartie-linux
+```
+
+If the service should run without root, ensure the selected user has access to the
+serial device, usually through the `dialout` group.
+
 ## Config example
 
 ```json
@@ -79,7 +123,7 @@ Run with the sample plugin:
     "contrast": 128,
     "brightness": 192
   },
-  "providers": ["cpu", "ram", "system", "network"],
+  "providers": ["cpu", "gpu", "ram", "system", "network"],
   "plugin_paths": [],
   "screens": [
     {
