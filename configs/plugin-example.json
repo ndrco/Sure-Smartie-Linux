@@ -1,0 +1,28 @@
+{
+  "device": "/dev/null",
+  "baudrate": 9600,
+  "refresh_ms": 1000,
+  "display": {
+    "type": "stdout",
+    "cols": 20,
+    "rows": 4
+  },
+  "providers": [
+    "system"
+  ],
+  "plugin_paths": [
+    "./build/sure_smartie_demo_plugin.so"
+  ],
+  "screens": [
+    {
+      "name": "plugin-demo",
+      "interval_ms": 2000,
+      "lines": [
+        "PLG {demo.message}",
+        "COUNT {demo.counter}",
+        "{system.time}",
+        "{system.hostname}"
+      ]
+    }
+  ]
+}

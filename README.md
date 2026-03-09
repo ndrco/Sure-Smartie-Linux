@@ -10,11 +10,15 @@ This repository now contains the phase 1 baseline:
 - native SURE serial display driver
 - `IDisplay` abstraction with `sure` and `stdout` implementations
 - serial layer on top of POSIX `termios`
-- built-in providers for CPU, RAM, system and network metrics
+- built-in providers for CPU, GPU, RAM, system and network metrics
 - template engine and screen rotation
 - JSON configuration loading
 
-Phase 2 targets dynamic `.so` plugins through `dlopen`.
+Phase 2 extends that baseline with:
+
+- built-in GPU provider
+- pseudo-graphics bars via custom LCD characters
+- dynamic `.so` providers through `dlopen`
 
 ## Repository layout
 
@@ -54,6 +58,12 @@ Run against the physical display:
 ./build/sure-smartie-linux --config configs/sure-example.json
 ```
 
+Run with the sample plugin:
+
+```bash
+./build/sure-smartie-linux --config configs/plugin-example.json --once
+```
+
 ## Config example
 
 ```json
@@ -70,14 +80,15 @@ Run against the physical display:
     "brightness": 192
   },
   "providers": ["cpu", "ram", "system", "network"],
+  "plugin_paths": [],
   "screens": [
     {
       "name": "cpu_gpu",
       "interval_ms": 2000,
       "lines": [
-        "CPU {cpu.load}% {cpu.temp}C",
-        "RAM {ram.percent}% {ram.used_gb}/{ram.total_gb}",
-        "IP  {net.ip}",
+        "CPU {bar:cpu.load,6} {cpu.load}%",
+        "GPU {bar:gpu.load,6} {gpu.load}%",
+        "VRM {gpu.mem_used}/{gpu.mem_total}",
         "{system.time} {system.hostname}"
       ]
     }
@@ -95,3 +106,8 @@ The current driver uses the commands validated in `Tests/sure_lcd_test.py` and i
 - brightness: `FE 98 <value>`
 - backlight on: `FE 42 00`
 - backlight off: `FE 46`
+
+The template engine also supports bar macros:
+
+- `{bar:cpu.load,6}` renders a 6-cell bar for values in the default range `0..100`
+- `{bar:gpu.mem_percent,8,100}` renders a bar with an explicit max value

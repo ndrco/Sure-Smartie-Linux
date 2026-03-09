@@ -27,9 +27,9 @@ ScreenDefinition defaultScreen() {
       .interval = std::chrono::milliseconds{2000},
       .lines =
           {
-              "CPU {cpu.load}% {cpu.temp}C",
-              "RAM {ram.percent}% {ram.used_gb}/{ram.total_gb}",
-              "IP  {net.ip}",
+              "CPU {bar:cpu.load,6} {cpu.load}%",
+              "GPU {bar:gpu.load,6} {gpu.load}%",
+              "VRM {gpu.mem_used}/{gpu.mem_total}",
               "{system.time} {system.hostname}",
           },
   };
@@ -83,6 +83,11 @@ AppConfig ConfigLoader::loadFromFile(const std::filesystem::path& path) {
 
   if (document.contains("providers")) {
     config.providers = document.at("providers").get<std::vector<std::string>>();
+  }
+
+  if (document.contains("plugin_paths")) {
+    config.plugin_paths =
+        document.at("plugin_paths").get<std::vector<std::string>>();
   }
 
   config.screens.clear();

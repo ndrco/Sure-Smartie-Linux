@@ -12,6 +12,7 @@
   },
   "providers": [
     "cpu",
+    "gpu",
     "ram",
     "system",
     "network"
@@ -21,9 +22,9 @@
       "name": "overview",
       "interval_ms": 2500,
       "lines": [
-        "CPU {cpu.load}% {cpu.temp}C",
-        "RAM {ram.percent}% {ram.used_gb}/{ram.total_gb}",
-        "IP  {net.ip}",
+        "CPU {bar:cpu.load,6} {cpu.load}%",
+        "GPU {bar:gpu.load,6} {gpu.load}%",
+        "VRM {gpu.mem_used}/{gpu.mem_total}",
         "{system.time} {system.hostname}"
       ]
     },
@@ -31,10 +32,10 @@
       "name": "network",
       "interval_ms": 2500,
       "lines": [
-        "NET {net.iface} {net.ip}",
+        "NET {net.iface}",
         "RX {net.rx_total}",
         "TX {net.tx_total}",
-        "UP {system.uptime}"
+        "{net.ip}"
       ]
     }
   ]

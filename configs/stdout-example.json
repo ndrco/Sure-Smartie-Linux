@@ -9,6 +9,7 @@
   },
   "providers": [
     "cpu",
+    "gpu",
     "ram",
     "system",
     "network"
@@ -18,9 +19,9 @@
       "name": "stdout-preview",
       "interval_ms": 2000,
       "lines": [
-        "CPU {cpu.load}% CLK {cpu.clock}",
+        "CPU {bar:cpu.load,6} {cpu.load}%",
+        "GPU {bar:gpu.load,6} {gpu.load}%",
         "RAM {ram.percent}% {ram.used_gb}",
-        "NET {net.iface} {net.ip}",
         "{system.time} {system.hostname}"
       ]
     }

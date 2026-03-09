@@ -3,9 +3,11 @@
 #include <csignal>
 #include <exception>
 #include <iostream>
+#include <iterator>
 #include <thread>
 
 #include "sure_smartie/display/DisplayFactory.hpp"
+#include "sure_smartie/plugins/PluginLoader.hpp"
 #include "sure_smartie/providers/BuiltinProviderFactory.hpp"
 #include "sure_smartie/providers/IProvider.hpp"
 
@@ -20,13 +22,24 @@ void onSignal([[maybe_unused]] int signal) {
   }
 }
 
+std::vector<std::unique_ptr<providers::IProvider>> createProviders(
+    const AppConfig& config) {
+  auto providers = providers::createBuiltinProviders(config.providers);
+  auto plugin_providers = plugins::loadProviderPlugins(config.plugin_paths);
+
+  providers.insert(providers.end(),
+                   std::make_move_iterator(plugin_providers.begin()),
+                   std::make_move_iterator(plugin_providers.end()));
+  return providers;
+}
+
 }  // namespace
 
 App::App(AppConfig config, RuntimeOptions options)
     : config_(std::move(config)),
       options_(options),
       display_(display::createDisplay(config_, options_)),
-      providers_(providers::createBuiltinProviders(config_.providers)),
+      providers_(createProviders(config_)),
       screen_manager_(config_.screens) {}
 
 MetricMap App::collectMetrics() {

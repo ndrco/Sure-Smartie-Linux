@@ -33,6 +33,18 @@ int main() {
   assert(frame[1] == "HOST box            ");
   assert(frame[2] == "                    ");
 
+  sure_smartie::core::ScreenDefinition bar_screen{
+      .name = "bars",
+      .interval = std::chrono::milliseconds{5},
+      .lines = {"CPU {bar:cpu.load,4} {cpu.load}%"},
+  };
+  const auto bar_frame =
+      engine.render(bar_screen, metrics, {.cols = 20, .rows = 1});
+  assert(bar_frame.size() == 1);
+  assert(bar_frame[0].size() == 20);
+  assert(static_cast<unsigned char>(bar_frame[0][4]) == 5);
+  assert(static_cast<unsigned char>(bar_frame[0][5]) == 3);
+
   sure_smartie::engine::ScreenManager manager({first, second});
   const auto start = std::chrono::steady_clock::now();
   assert(manager.current(start).name == "first");

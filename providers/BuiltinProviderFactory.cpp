@@ -5,6 +5,7 @@
 #include <unordered_set>
 
 #include "sure_smartie/providers/CpuProvider.hpp"
+#include "sure_smartie/providers/GpuProvider.hpp"
 #include "sure_smartie/providers/NetworkProvider.hpp"
 #include "sure_smartie/providers/RamProvider.hpp"
 #include "sure_smartie/providers/SystemProvider.hpp"
@@ -28,6 +29,11 @@ std::vector<std::unique_ptr<IProvider>> createBuiltinProviders(
 
     if (provider_name == "ram") {
       providers.push_back(std::make_unique<RamProvider>());
+      continue;
+    }
+
+    if (provider_name == "gpu") {
+      providers.push_back(std::make_unique<GpuProvider>());
       continue;
     }
 

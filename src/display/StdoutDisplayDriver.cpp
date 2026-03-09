@@ -5,6 +5,33 @@
 #include "sure_smartie/engine/TemplateEngine.hpp"
 
 namespace sure_smartie::display {
+namespace {
+
+char printableGlyph(char symbol) {
+  switch (static_cast<unsigned char>(symbol)) {
+    case 1:
+      return '.';
+    case 2:
+      return ':';
+    case 3:
+      return '=';
+    case 4:
+      return '#';
+    case 5:
+      return '@';
+    default:
+      return symbol;
+  }
+}
+
+std::string toPrintable(std::string line) {
+  for (char& symbol : line) {
+    symbol = printableGlyph(symbol);
+  }
+  return line;
+}
+
+}  // namespace
 
 StdoutDisplayDriver::StdoutDisplayDriver(core::DisplayGeometry geometry)
     : geometry_(geometry) {}
@@ -18,9 +45,8 @@ void StdoutDisplayDriver::render(const core::Frame& frame) {
   for (std::size_t row = 0; row < geometry_.rows; ++row) {
     const std::string line =
         row < frame.size() ? frame[row] : std::string(geometry_.cols, ' ');
-    std::cout
-        << engine::TemplateEngine::fitToWidth(line, geometry_.cols)
-        << '\n';
+    std::cout << toPrintable(engine::TemplateEngine::fitToWidth(line, geometry_.cols))
+              << '\n';
   }
 }
 

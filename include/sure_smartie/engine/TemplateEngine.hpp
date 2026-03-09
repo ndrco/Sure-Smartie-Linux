@@ -15,6 +15,10 @@ class TemplateEngine {
   static std::string fitToWidth(std::string text, std::size_t width);
 
  private:
+  static std::string renderBar(const std::string& metric_key,
+                               std::size_t width,
+                               double max_value,
+                               const core::MetricMap& metrics);
   static std::string renderLine(const std::string& line,
                                 const core::MetricMap& metrics);
 };

@@ -28,6 +28,7 @@ class SureDisplayDriver : public IDisplay {
                              const std::array<std::uint8_t, 8>& pattern) override;
 
  private:
+  void uploadBuiltInGlyphs();
   static std::string sanitizeText(std::string text, std::size_t width);
   void writeLine(std::size_t row, const std::string& text);
   void writeBytes(std::initializer_list<std::uint8_t> bytes);

@@ -37,7 +37,8 @@ struct AppConfig {
   int baudrate{9600};
   std::chrono::milliseconds refresh_interval{1000};
   DisplayConfig display;
-  std::vector<std::string> providers{"cpu", "ram", "system", "network"};
+  std::vector<std::string> providers{"cpu", "gpu", "ram", "system", "network"};
+  std::vector<std::string> plugin_paths;
   std::vector<ScreenDefinition> screens;
 };
 
