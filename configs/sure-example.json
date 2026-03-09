@@ -1,0 +1,41 @@
+{
+  "device": "/dev/ttyUSB1",
+  "baudrate": 9600,
+  "refresh_ms": 1000,
+  "display": {
+    "type": "sure",
+    "cols": 20,
+    "rows": 4,
+    "backlight": true,
+    "contrast": 128,
+    "brightness": 192
+  },
+  "providers": [
+    "cpu",
+    "ram",
+    "system",
+    "network"
+  ],
+  "screens": [
+    {
+      "name": "overview",
+      "interval_ms": 2500,
+      "lines": [
+        "CPU {cpu.load}% {cpu.temp}C",
+        "RAM {ram.percent}% {ram.used_gb}/{ram.total_gb}",
+        "IP  {net.ip}",
+        "{system.time} {system.hostname}"
+      ]
+    },
+    {
+      "name": "network",
+      "interval_ms": 2500,
+      "lines": [
+        "NET {net.iface} {net.ip}",
+        "RX {net.rx_total}",
+        "TX {net.tx_total}",
+        "UP {system.uptime}"
+      ]
+    }
+  ]
+}
