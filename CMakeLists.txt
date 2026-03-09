@@ -111,26 +111,46 @@ target_compile_definitions(
 if(SURE_SMARTIE_BUILD_GUI)
   find_package(Qt6 COMPONENTS Core Gui Widgets QUIET)
   if(Qt6_FOUND)
-    add_executable(
-      sure-smartie-gui
+    add_library(
+      sure_smartie_gui
+      STATIC
       src/gui/LcdPreviewWidget.cpp
       src/gui/MainWindow.cpp
-      src/gui/main.cpp
     )
     target_link_libraries(
-      sure-smartie-gui
-      PRIVATE
+      sure_smartie_gui
+      PUBLIC
         sure_smartie_core
+      PRIVATE
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
     )
     target_compile_options(
-      sure-smartie-gui
+      sure_smartie_gui
       PRIVATE
         -Wall
         -Wextra
         -Wpedantic
+    )
+    target_include_directories(
+      sure_smartie_gui
+      PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/third_party
+    )
+
+    add_executable(
+      sure-smartie-gui
+      src/gui/main.cpp
+    )
+    target_link_libraries(
+      sure-smartie-gui
+      PRIVATE
+        sure_smartie_gui
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
     )
     install(TARGETS sure-smartie-gui RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
   else()
@@ -236,12 +256,17 @@ if(BUILD_TESTING AND SURE_SMARTIE_BUILD_TESTS)
     target_link_libraries(
       gui_smoke
       PRIVATE
-        sure_smartie_core
+        sure_smartie_gui
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
     )
     add_test(NAME gui_smoke COMMAND gui_smoke)
-    set_tests_properties(gui_smoke PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    set_tests_properties(
+      gui_smoke
+      PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
   endif()
 endif()

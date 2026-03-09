@@ -39,6 +39,7 @@ class LcdPreviewWidget;
 class MainWindow : public QMainWindow {
  public:
   explicit MainWindow(QWidget* parent = nullptr);
+  ~MainWindow() override;
 
   bool loadConfigFile(const QString& path, QString* error_message = nullptr);
   bool saveConfigFile(const QString& path, QString* error_message = nullptr);

@@ -178,6 +178,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), config_(makeDefau
   refreshPreview(true);
 }
 
+MainWindow::~MainWindow() = default;
+
 bool MainWindow::loadConfigFile(const QString& path, QString* error_message) {
   try {
     config_ = core::ConfigLoader::loadFromFile(toPath(path));
