@@ -1,6 +1,7 @@
 #include <filesystem>
 #include <cstdlib>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -9,6 +10,7 @@
 #include "sure_smartie/core/App.hpp"
 #include "sure_smartie/core/Config.hpp"
 #include "sure_smartie/core/ConfigValidator.hpp"
+#include "sure_smartie/display/DisplayFactory.hpp"
 #include "sure_smartie/core/Logger.hpp"
 
 namespace {
@@ -88,10 +90,28 @@ void printDiagnostics(
   }
 }
 
+int runBacklightCommand(sure_smartie::core::AppConfig config,
+                        sure_smartie::core::RuntimeOptions options,
+                        bool backlight_on) {
+  config.display.backlight = backlight_on;
+
+  auto display = sure_smartie::display::createDisplay(config, options);
+  display->initialize();
+  display->release();
+
+  sure_smartie::core::logMessage(
+      sure_smartie::core::LogLevel::info,
+      "main",
+      "backlight command applied",
+      {{"backlight", backlight_on ? "on" : "off"}});
+  return 0;
+}
+
 void printUsage(const char* program_name) {
   std::cout << "Usage: " << program_name
             << " [--config <path>] [--device <path>] [--once] [--stdout]"
-               " [--validate-config] [--log-level <trace|debug|info|warn|error>]\n";
+               " [--validate-config] [--backlight <on|off>]"
+               " [--log-level <trace|debug|info|warn|error>]\n";
 }
 
 }  // namespace
@@ -99,6 +119,7 @@ void printUsage(const char* program_name) {
 int main(int argc, char** argv) {
   std::filesystem::path config_path{defaultConfigPath()};
   std::string device_override;
+  std::optional<bool> backlight_override;
   sure_smartie::core::RuntimeOptions options;
 
   try {
@@ -138,6 +159,22 @@ int main(int argc, char** argv) {
         continue;
       }
 
+      if (arg == "--backlight") {
+        if (index + 1 >= argc) {
+          throw std::invalid_argument("--backlight requires on or off");
+        }
+
+        const std::string_view value{argv[++index]};
+        if (value == "on") {
+          backlight_override = true;
+        } else if (value == "off") {
+          backlight_override = false;
+        } else {
+          throw std::invalid_argument("--backlight requires on or off");
+        }
+        continue;
+      }
+
       if (arg == "--log-level") {
         if (index + 1 >= argc) {
           throw std::invalid_argument("--log-level requires a value");
@@ -172,6 +209,10 @@ int main(int argc, char** argv) {
     }
     if (hasErrors(diagnostics)) {
       throw std::invalid_argument("configuration validation failed");
+    }
+
+    if (backlight_override.has_value()) {
+      return runBacklightCommand(config, options, *backlight_override);
     }
 
     sure_smartie::core::logMessage(

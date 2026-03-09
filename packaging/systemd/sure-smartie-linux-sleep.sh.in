@@ -1,0 +1,41 @@
+#!/bin/sh
+
+set -eu
+
+SERVICE_NAME="sure-smartie-linux.service"
+ENV_FILE="@SURE_SMARTIE_ENV_FILE@"
+BINARY="@CMAKE_INSTALL_FULL_BINDIR@/sure-smartie-linux"
+
+if [ -f "$ENV_FILE" ]; then
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+fi
+
+freeze_service() {
+  if command -v systemctl >/dev/null 2>&1; then
+    if systemctl is-active --quiet "$SERVICE_NAME"; then
+      systemctl kill -s SIGSTOP "$SERVICE_NAME" || true
+    fi
+  fi
+}
+
+thaw_service() {
+  if command -v systemctl >/dev/null 2>&1; then
+    if systemctl is-active --quiet "$SERVICE_NAME"; then
+      systemctl kill -s SIGCONT "$SERVICE_NAME" || true
+    fi
+  fi
+}
+
+case "${1:-}" in
+  pre)
+    freeze_service
+    "$BINARY" --backlight off || true
+    ;;
+  post)
+    "$BINARY" --backlight on || true
+    thaw_service
+    ;;
+esac
+
+exit 0

@@ -17,18 +17,28 @@ set(SURE_SMARTIE_SYSTEMD_UNIT_DIR "lib/systemd/system" CACHE STRING
     "Install directory for systemd unit files")
 set(SURE_SMARTIE_SYSUSERS_DIR "${CMAKE_INSTALL_LIBDIR}/sysusers.d" CACHE STRING
     "Install directory for sysusers.d files")
+set(SURE_SMARTIE_SYSTEM_SLEEP_DIR "lib/systemd/system-sleep" CACHE STRING
+    "Install directory for systemd sleep hooks")
 set(SURE_SMARTIE_SERVICE_USER "_sure-smartie" CACHE STRING
     "User for the systemd service")
 set(SURE_SMARTIE_SERVICE_GROUP "_sure-smartie" CACHE STRING
     "Primary group for the systemd service")
 set(SURE_SMARTIE_SERIAL_GROUP "dialout" CACHE STRING
     "Supplementary group that grants serial device access")
+set(SURE_SMARTIE_ENV_FILE "${CMAKE_INSTALL_FULL_SYSCONFDIR}/default/sure-smartie-linux" CACHE STRING
+    "Environment file shared by the service and the sleep hook")
 
 find_package(Threads REQUIRED)
 
 configure_file(
   packaging/systemd/sure-smartie-linux.service.in
   ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-linux.service
+  @ONLY
+)
+
+configure_file(
+  packaging/systemd/sure-smartie-linux-sleep.sh.in
+  ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-linux-sleep.sh
   @ONLY
 )
 
@@ -212,8 +222,22 @@ install(
   DESTINATION ${SURE_SMARTIE_SYSTEMD_UNIT_DIR}
 )
 install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-linux-sleep.sh
+  DESTINATION ${SURE_SMARTIE_SYSTEM_SLEEP_DIR}
+  RENAME sure-smartie-linux
+  PERMISSIONS
+    OWNER_READ OWNER_WRITE OWNER_EXECUTE
+    GROUP_READ GROUP_EXECUTE
+    WORLD_READ WORLD_EXECUTE
+)
+install(
   FILES packaging/sysusers/sure-smartie-linux.conf
   DESTINATION ${SURE_SMARTIE_SYSUSERS_DIR}
+)
+install(
+  FILES packaging/systemd/sure-smartie-linux.env
+  DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/default
+  RENAME sure-smartie-linux
 )
 install(
   EXPORT SureSmartieLinuxPluginSDKTargets
@@ -249,6 +273,13 @@ if(BUILD_TESTING AND SURE_SMARTIE_BUILD_TESTS)
       $<TARGET_FILE:sure-smartie-linux>
       --config ${PROJECT_SOURCE_DIR}/configs/stdout-example.json
       --validate-config
+  )
+  add_test(
+    NAME backlight_command_smoke
+    COMMAND
+      $<TARGET_FILE:sure-smartie-linux>
+      --config ${PROJECT_SOURCE_DIR}/configs/stdout-example.json
+      --backlight off
   )
 
   if(TARGET sure-smartie-gui)

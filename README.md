@@ -121,6 +121,13 @@ Validate a config without starting the render loop:
 ./build/sure-smartie-linux --config configs/sure-example.json --validate-config
 ```
 
+Apply a direct backlight command without starting the render loop:
+
+```bash
+./build/sure-smartie-linux --config configs/sure-example.json --backlight off
+./build/sure-smartie-linux --config configs/sure-example.json --backlight on
+```
+
 Override the serial device at runtime:
 
 ```bash
@@ -138,6 +145,10 @@ Set log verbosity:
 The install step generates and installs `sure-smartie-linux.service`.
 It also installs `sure-smartie-linux.conf` into `sysusers.d`, which creates the
 `_sure-smartie` service user and adds it to `dialout`.
+It also installs:
+
+- `/usr/local/etc/default/sure-smartie-linux` as a shared environment file
+- `/usr/local/lib/systemd/system-sleep/sure-smartie-linux` as a suspend/resume hook
 
 Typical flow:
 
@@ -151,6 +162,17 @@ sudo systemctl enable --now sure-smartie-linux
 
 If the service should run without root, ensure the selected user has access to the
 serial device, usually through the `dialout` group.
+
+For suspend/resume handling, the installed sleep hook now:
+
+- sends `--backlight off` before suspend
+- sends `--backlight on` after resume
+- temporarily pauses the running `sure-smartie-linux.service` with `SIGSTOP/SIGCONT`
+  to avoid racing the display while the hook talks to the serial device
+
+If you keep the runtime config in a non-default location, set `SURE_SMARTIE_CONFIG`
+inside `/usr/local/etc/default/sure-smartie-linux` so both the service and the
+sleep hook use the same file.
 
 The service logs clean single-line entries that work well with journald, for example:
 
