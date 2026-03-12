@@ -58,8 +58,12 @@ class MainWindow : public QMainWindow {
   void applyStyle();
   void updateWindowTitle();
   void updateProjectSummary();
+  void updateFooterActions();
   void setDirty(bool dirty);
   bool maybeDiscardChanges();
+  bool saveCurrentConfig(bool force_prompt, QString* error_message = nullptr);
+  bool applyCurrentConfig(QString* error_message = nullptr);
+  void revertCurrentConfig();
 
   void syncUiFromConfig();
   void syncDisplaySectionFromConfig();
@@ -133,6 +137,7 @@ class MainWindow : public QMainWindow {
   QTimer* preview_timer_{nullptr};
   LcdPreviewWidget* preview_widget_{nullptr};
   QListWidget* validation_list_{nullptr};
+  QWidget* footer_actions_{nullptr};
 };
 
 }  // namespace sure_smartie::gui

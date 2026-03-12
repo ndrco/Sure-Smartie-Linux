@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -32,6 +34,8 @@ class CpuProvider : public IProvider {
   static std::string readCpuClock();
 
   std::optional<CpuTimes> previous_sample_;
+  std::optional<std::pair<std::uint64_t, std::chrono::steady_clock::time_point>>
+      previous_energy_sample_;
   double last_load_percent_{0.0};
 };
 

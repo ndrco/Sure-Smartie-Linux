@@ -12,6 +12,8 @@
 #include "sure_smartie/core/PreviewFrameRenderer.hpp"
 #include "sure_smartie/core/Types.hpp"
 #include "sure_smartie/engine/TemplateEngine.hpp"
+#include "sure_smartie/providers/CpuProvider.hpp"
+#include "sure_smartie/providers/GpuProvider.hpp"
 
 namespace {
 
@@ -125,6 +127,19 @@ int main() {
       template_engine.render(config.screens.front(), metrics, {20, 4});
   const auto actual = renderer.renderScreen(config, metrics, 0);
   assert(expected == actual);
+
+  sure_smartie::providers::CpuProvider cpu_provider;
+  sure_smartie::providers::GpuProvider gpu_provider;
+  MetricMap collected_metrics;
+  cpu_provider.collect(collected_metrics);
+  gpu_provider.collect(collected_metrics);
+
+  assert(collected_metrics.contains("cpu.power_w"));
+  assert(collected_metrics.contains("cpu.fan_rpm"));
+  assert(collected_metrics.contains("cpu.fan_percent"));
+  assert(collected_metrics.contains("gpu.power_w"));
+  assert(collected_metrics.contains("gpu.fan_rpm"));
+  assert(collected_metrics.contains("gpu.fan_percent"));
 
   return 0;
 }

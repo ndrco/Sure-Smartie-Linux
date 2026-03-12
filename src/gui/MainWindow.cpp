@@ -30,6 +30,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSpinBox>
+#include <QStyle>
 #include <QSplitter>
 #include <QStatusBar>
 #include <QStringList>
@@ -287,32 +288,15 @@ void MainWindow::buildUi() {
   });
 
   connect(save_action, &QAction::triggered, this, [this]() {
-    QString target_path = currentConfigPath();
-    if (target_path.isEmpty()) {
-      target_path = QFileDialog::getSaveFileName(
-          this, "Save config", "sure-smartie.json", "JSON files (*.json)");
-      if (target_path.isEmpty()) {
-        return;
-      }
-    }
-
     QString error_message;
-    if (!saveConfigFile(target_path, &error_message)) {
+    if (!saveCurrentConfig(false, &error_message)) {
       QMessageBox::critical(this, "Save failed", error_message);
     }
   });
 
   connect(save_as_action, &QAction::triggered, this, [this]() {
-    const QString target_path = QFileDialog::getSaveFileName(
-        this, "Save config as", currentConfigPath().isEmpty() ? "sure-smartie.json"
-                                                              : currentConfigPath(),
-        "JSON files (*.json)");
-    if (target_path.isEmpty()) {
-      return;
-    }
-
     QString error_message;
-    if (!saveConfigFile(target_path, &error_message)) {
+    if (!saveCurrentConfig(true, &error_message)) {
       QMessageBox::critical(this, "Save failed", error_message);
     }
   });
@@ -320,34 +304,51 @@ void MainWindow::buildUi() {
   connect(quit_action, &QAction::triggered, this, [this]() { close(); });
 
   auto* central = new QWidget(this);
-  auto* root_layout = new QHBoxLayout(central);
+  central->setObjectName("mainCanvas");
+  auto* root_layout = new QVBoxLayout(central);
   root_layout->setContentsMargins(12, 12, 12, 12);
+  root_layout->setSpacing(12);
 
   auto* splitter = new QSplitter(Qt::Horizontal, central);
+  splitter->setObjectName("mainSplitter");
   root_layout->addWidget(splitter);
   setCentralWidget(central);
 
   auto* left_scroll = new QScrollArea(splitter);
   left_scroll->setWidgetResizable(true);
   left_scroll->setFrameShape(QFrame::NoFrame);
+  left_scroll->viewport()->setObjectName("leftScrollViewport");
 
   auto* editor_root = new QWidget(left_scroll);
+  editor_root->setObjectName("editorRoot");
   auto* editor_layout = new QVBoxLayout(editor_root);
   editor_layout->setContentsMargins(0, 0, 12, 0);
-  editor_layout->setSpacing(14);
+  editor_layout->setSpacing(12);
   left_scroll->setWidget(editor_root);
 
   auto* project_group = new QGroupBox("Project", editor_root);
   auto* project_layout = new QVBoxLayout(project_group);
+  project_layout->setContentsMargins(16, 18, 16, 14);
+  project_layout->setSpacing(6);
   project_path_label_ = new QLabel(project_group);
+  project_path_label_->setObjectName("projectSummaryLabel");
+  project_path_label_->setWordWrap(true);
   dirty_state_label_ = new QLabel(project_group);
+  dirty_state_label_->setObjectName("dirtyStateLabel");
+  dirty_state_label_->setWordWrap(true);
   project_layout->addWidget(project_path_label_);
   project_layout->addWidget(dirty_state_label_);
   editor_layout->addWidget(project_group);
 
   auto* display_group = new QGroupBox("Display Settings", editor_root);
   auto* display_layout = new QFormLayout(display_group);
+  display_layout->setContentsMargins(16, 18, 16, 16);
+  display_layout->setHorizontalSpacing(14);
+  display_layout->setVerticalSpacing(10);
+  display_layout->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+  display_layout->setFormAlignment(Qt::AlignTop);
   device_edit_ = new QLineEdit(display_group);
+  device_edit_->setPlaceholderText("/dev/ttyUSB0");
   refresh_interval_spin_ = new QSpinBox(display_group);
   refresh_interval_spin_->setRange(-1000000, 600000);
   baudrate_spin_ = new QSpinBox(display_group);
@@ -377,7 +378,14 @@ void MainWindow::buildUi() {
 
   auto* providers_group = new QGroupBox("Providers & Plugins", editor_root);
   auto* providers_layout = new QVBoxLayout(providers_group);
+  providers_layout->setContentsMargins(16, 18, 16, 16);
+  providers_layout->setSpacing(10);
+  auto* builtin_label = new QLabel("Builtin providers", providers_group);
+  builtin_label->setObjectName("sectionCaptionLabel");
+  providers_layout->addWidget(builtin_label);
   auto* provider_grid = new QGridLayout();
+  provider_grid->setHorizontalSpacing(20);
+  provider_grid->setVerticalSpacing(8);
   int provider_column = 0;
   int provider_row = 0;
   for (const auto& provider_name : providers::builtinProviderNames()) {
@@ -392,17 +400,27 @@ void MainWindow::buildUi() {
   }
   providers_layout->addLayout(provider_grid);
   extra_providers_label_ = new QLabel(providers_group);
+  extra_providers_label_->setObjectName("sectionHintLabel");
   extra_providers_label_->setWordWrap(true);
   providers_layout->addWidget(extra_providers_label_);
-  providers_layout->addWidget(new QLabel("Plugin paths", providers_group));
+  auto* plugin_paths_label = new QLabel("Plugin paths", providers_group);
+  plugin_paths_label->setObjectName("sectionCaptionLabel");
+  providers_layout->addWidget(plugin_paths_label);
   plugin_paths_list_ = new QListWidget(providers_group);
+  plugin_paths_list_->setObjectName("pluginPathsList");
   plugin_paths_list_->setSelectionMode(QAbstractItemView::SingleSelection);
+  plugin_paths_list_->setMinimumHeight(110);
+  plugin_paths_list_->setMaximumHeight(160);
+  plugin_paths_list_->setAlternatingRowColors(true);
+  plugin_paths_list_->setUniformItemSizes(true);
   providers_layout->addWidget(plugin_paths_list_);
   auto* plugin_buttons = new QHBoxLayout();
+  plugin_buttons->setSpacing(8);
   auto* add_plugin_button = new QPushButton("Add plugin", providers_group);
   auto* remove_plugin_button = new QPushButton("Remove plugin", providers_group);
   plugin_buttons->addWidget(add_plugin_button);
   plugin_buttons->addWidget(remove_plugin_button);
+  plugin_buttons->addStretch(1);
   providers_layout->addLayout(plugin_buttons);
   editor_layout->addWidget(providers_group);
 
@@ -442,28 +460,45 @@ void MainWindow::buildUi() {
   editor_layout->addStretch(1);
 
   auto* right_panel = new QWidget(splitter);
+  right_panel->setObjectName("rightPanel");
   auto* right_layout = new QVBoxLayout(right_panel);
   right_layout->setContentsMargins(8, 0, 0, 0);
-  right_layout->setSpacing(14);
+  right_layout->setSpacing(12);
 
   auto* preview_group = new QGroupBox("Preview", right_panel);
   auto* preview_layout = new QVBoxLayout(preview_group);
-  auto* preview_controls = new QHBoxLayout();
+  preview_layout->setContentsMargins(16, 18, 16, 16);
+  preview_layout->setSpacing(10);
+  auto* preview_row_top = new QHBoxLayout();
+  preview_row_top->setSpacing(10);
+  auto* preview_row_bottom = new QHBoxLayout();
+  preview_row_bottom->setSpacing(10);
   preview_screen_combo_ = new QComboBox(preview_group);
+  preview_screen_combo_->setObjectName("previewScreenCombo");
   rotation_preview_check_ = new QCheckBox("Rotation preview", preview_group);
+  rotation_preview_check_->setObjectName("rotationPreviewCheck");
   preview_refresh_spin_ = new QSpinBox(preview_group);
+  preview_refresh_spin_->setObjectName("previewRefreshSpin");
   preview_refresh_spin_->setRange(200, 10000);
   preview_refresh_spin_->setSingleStep(100);
   preview_refresh_spin_->setValue(1000);
   auto* refresh_button = new QPushButton("Refresh now", preview_group);
-  preview_controls->addWidget(new QLabel("Screen", preview_group));
-  preview_controls->addWidget(preview_screen_combo_, 1);
-  preview_controls->addWidget(rotation_preview_check_);
-  preview_controls->addWidget(new QLabel("Refresh ms", preview_group));
-  preview_controls->addWidget(preview_refresh_spin_);
-  preview_controls->addWidget(refresh_button);
-  preview_layout->addLayout(preview_controls);
+  auto* screen_label = new QLabel("Screen", preview_group);
+  screen_label->setObjectName("sectionCaptionLabel");
+  auto* refresh_label = new QLabel("Refresh ms", preview_group);
+  refresh_label->setObjectName("sectionCaptionLabel");
+  preview_row_top->addWidget(screen_label);
+  preview_row_top->addWidget(preview_screen_combo_, 1);
+  preview_row_top->addWidget(refresh_button);
+  preview_row_bottom->addWidget(rotation_preview_check_);
+  preview_row_bottom->addStretch(1);
+  preview_row_bottom->addWidget(refresh_label);
+  preview_row_bottom->addWidget(preview_refresh_spin_);
+  preview_layout->addLayout(preview_row_top);
+  preview_layout->addLayout(preview_row_bottom);
   preview_status_label_ = new QLabel(preview_group);
+  preview_status_label_->setObjectName("previewStatusLabel");
+  preview_status_label_->setWordWrap(true);
   preview_layout->addWidget(preview_status_label_);
   preview_widget_ = new LcdPreviewWidget(preview_group);
   preview_layout->addWidget(preview_widget_, 1);
@@ -471,9 +506,34 @@ void MainWindow::buildUi() {
 
   auto* validation_group = new QGroupBox("Validation", right_panel);
   auto* validation_layout = new QVBoxLayout(validation_group);
+  validation_layout->setContentsMargins(16, 18, 16, 16);
   validation_list_ = new QListWidget(validation_group);
+  validation_list_->setObjectName("validationList");
+  validation_list_->setMinimumHeight(120);
+  validation_list_->setMaximumHeight(190);
+  validation_list_->setAlternatingRowColors(true);
+  validation_list_->setUniformItemSizes(true);
   validation_layout->addWidget(validation_list_);
-  right_layout->addWidget(validation_group, 1);
+  right_layout->addWidget(validation_group, 0);
+
+  footer_actions_ = new QWidget(central);
+  footer_actions_->setObjectName("footerActions");
+  footer_actions_->setMaximumHeight(44);
+  auto* footer_layout = new QHBoxLayout(footer_actions_);
+  footer_layout->setContentsMargins(0, 4, 0, 0);
+  footer_layout->setSpacing(8);
+  footer_layout->addStretch(1);
+
+  auto* cancel_button = new QPushButton("Cancel", footer_actions_);
+  cancel_button->setObjectName("footerCancelButton");
+  auto* apply_button = new QPushButton("Apply", footer_actions_);
+  apply_button->setObjectName("footerApplyButton");
+  auto* save_button = new QPushButton("Save", footer_actions_);
+  save_button->setObjectName("footerSaveButton");
+  footer_layout->addWidget(cancel_button);
+  footer_layout->addWidget(apply_button);
+  footer_layout->addWidget(save_button);
+  root_layout->addWidget(footer_actions_);
 
   splitter->addWidget(left_scroll);
   splitter->addWidget(right_panel);
@@ -693,30 +753,100 @@ void MainWindow::buildUi() {
     focusFieldPath(item->data(Qt::UserRole).toString());
   });
 
+  connect(save_button, &QPushButton::clicked, this, [this]() {
+    QString error_message;
+    if (!saveCurrentConfig(false, &error_message)) {
+      if (!error_message.isEmpty()) {
+        QMessageBox::critical(this, "Save failed", error_message);
+      }
+      return;
+    }
+  });
+  connect(apply_button, &QPushButton::clicked, this, [this]() {
+    QString error_message;
+    if (!applyCurrentConfig(&error_message)) {
+      if (!error_message.isEmpty()) {
+        QMessageBox::critical(this, "Apply failed", error_message);
+      }
+      return;
+    }
+  });
+  connect(cancel_button, &QPushButton::clicked, this, [this]() { revertCurrentConfig(); });
+
   statusBar()->showMessage("Ready", 1500);
+  updateFooterActions();
 }
 
 void MainWindow::applyStyle() {
   setStyleSheet(
-      "QMainWindow { background: #f5efe4; }"
+      "QMainWindow { background: #ece5d8; color: #2f2418; }"
+      "QWidget#mainCanvas, QWidget#editorRoot, QWidget#rightPanel, QWidget#leftScrollViewport {"
+      "  background: #ece5d8;"
+      "}"
+      "QSplitter#mainSplitter { background: #ece5d8; }"
       "QGroupBox {"
       "  font-weight: 600;"
-      "  border: 1px solid #d8ccb5;"
+      "  color: #4d3b2c;"
+      "  border: 1px solid #dccfbe;"
       "  border-radius: 12px;"
-      "  margin-top: 10px;"
-      "  background: #fffaf0;"
+      "  margin-top: 14px;"
+      "  padding-top: 12px;"
+      "  background: #faf6ee;"
       "}"
       "QGroupBox::title {"
       "  subcontrol-origin: margin;"
       "  left: 14px;"
-      "  padding: 0 6px;"
+      "  padding: 0 8px;"
+      "  background: #ece5d8;"
       "  color: #5b4630;"
       "}"
+      "QLabel { color: #403124; }"
+      "QLabel#sectionCaptionLabel { color: #6b533c; font-weight: 600; }"
+      "QLabel#sectionHintLabel { color: #6a5a49; }"
+      "QLabel#projectSummaryLabel { color: #4f3e2f; font-weight: 600; }"
+      "QLabel#dirtyStateLabel[dirtyState=\"false\"] { color: #2f6b47; }"
+      "QLabel#dirtyStateLabel[dirtyState=\"true\"] { color: #9f2d20; font-weight: 600; }"
+      "QLabel#previewStatusLabel { color: #355748; font-weight: 600; }"
       "QLineEdit, QSpinBox, QComboBox, QListWidget {"
-      "  background: #fffdf8;"
-      "  border: 1px solid #d7ccb7;"
+      "  color: #2c2319;"
+      "  background: #fffdf9;"
+      "  border: 1px solid #d6cab8;"
       "  border-radius: 8px;"
       "  padding: 6px 8px;"
+      "  selection-background-color: #cfe3dc;"
+      "  selection-color: #21342f;"
+      "}"
+      "QComboBox { padding-right: 18px; }"
+      "QSpinBox { padding-right: 20px; }"
+      "QLineEdit:focus, QSpinBox:focus, QComboBox:focus, QListWidget:focus {"
+      "  border: 1px solid #83a89a;"
+      "  background: #fffefb;"
+      "}"
+      "QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled, QListWidget:disabled {"
+      "  color: #7b6a58;"
+      "  background: #efe6d8;"
+      "  border: 1px solid #d2c4b0;"
+      "}"
+      "QComboBox QAbstractItemView {"
+      "  color: #2f2418;"
+      "  background: #fffdf9;"
+      "  border: 1px solid #d8cebf;"
+      "  selection-background-color: #d8e8e2;"
+      "  selection-color: #223630;"
+      "  outline: 0;"
+      "}"
+      "QCheckBox { color: #3d3025; spacing: 8px; }"
+      "QCheckBox:disabled { color: #8b7866; }"
+      "QCheckBox::indicator { width: 16px; height: 16px; }"
+      "QCheckBox::indicator:unchecked {"
+      "  border: 1px solid #9f8b71;"
+      "  border-radius: 4px;"
+      "  background: #fffdf9;"
+      "}"
+      "QCheckBox::indicator:checked {"
+      "  border: 1px solid #2b5549;"
+      "  border-radius: 4px;"
+      "  background: #2f6456;"
       "}"
       "QPushButton {"
       "  background: #274c45;"
@@ -724,10 +854,57 @@ void MainWindow::applyStyle() {
       "  border: none;"
       "  border-radius: 8px;"
       "  padding: 8px 12px;"
+      "  font-weight: 600;"
       "}"
       "QPushButton:hover { background: #1f3d38; }"
       "QPushButton:pressed { background: #17302d; }"
-      "QLabel { color: #443422; }");
+      "QPushButton:disabled { background: #b5b0a6; color: #f0ece4; }"
+      "QListWidget { alternate-background-color: #f7f2ea; }"
+      "QScrollArea { border: none; background: transparent; }"
+      "QScrollBar:vertical {"
+      "  background: #ece5d8;"
+      "  width: 12px;"
+      "  margin: 0;"
+      "}"
+      "QScrollBar::handle:vertical {"
+      "  background: #c9bba6;"
+      "  border-radius: 6px;"
+      "  min-height: 36px;"
+      "}"
+      "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {"
+      "  background: #ece5d8;"
+      "}"
+      "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {"
+      "  height: 0px;"
+      "  background: transparent;"
+      "}"
+      "QScrollBar:horizontal {"
+      "  background: #ece5d8;"
+      "  height: 12px;"
+      "  margin: 0;"
+      "}"
+      "QScrollBar::handle:horizontal {"
+      "  background: #c9bba6;"
+      "  border-radius: 6px;"
+      "  min-width: 36px;"
+      "}"
+      "QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {"
+      "  background: #ece5d8;"
+      "}"
+      "QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {"
+      "  width: 0px;"
+      "  background: transparent;"
+      "}"
+      "QSplitter::handle { background: #dfd4c6; width: 6px; }"
+      "QWidget#footerActions {"
+      "  border-top: 1px solid #dfd4c6;"
+      "  background: #efe8dc;"
+      "}"
+      "QWidget#footerActions QPushButton {"
+      "  padding: 6px 10px;"
+      "  min-height: 26px;"
+      "}"
+      "QStatusBar { background: #efe7da; color: #4d3c2d; }");
 }
 
 void MainWindow::updateWindowTitle() {
@@ -738,17 +915,21 @@ void MainWindow::updateWindowTitle() {
 }
 
 void MainWindow::updateProjectSummary() {
-  const QString path_text =
-      current_config_path_.empty() ? "Config: unsaved buffer"
-                                   : QString("Config: %1").arg(currentConfigPath());
+  const QString path_text = current_config_path_.empty()
+                                ? "Config source: unsaved buffer"
+                                : QString("Config source: %1").arg(currentConfigPath());
   project_path_label_->setText(path_text);
-  dirty_state_label_->setText(dirty_ ? "State: modified" : "State: saved");
+  dirty_state_label_->setText(dirty_ ? "Buffer state: modified" : "Buffer state: clean");
+  dirty_state_label_->setProperty("dirtyState", dirty_);
+  dirty_state_label_->style()->unpolish(dirty_state_label_);
+  dirty_state_label_->style()->polish(dirty_state_label_);
 }
 
 void MainWindow::setDirty(bool dirty) {
   dirty_ = dirty;
   updateProjectSummary();
   updateWindowTitle();
+  updateFooterActions();
 }
 
 bool MainWindow::maybeDiscardChanges() {
@@ -771,22 +952,91 @@ bool MainWindow::maybeDiscardChanges() {
     return false;
   }
 
-  QString target_path = currentConfigPath();
-  if (target_path.isEmpty()) {
-    target_path = QFileDialog::getSaveFileName(
-        this, "Save config", "sure-smartie.json", "JSON files (*.json)");
-    if (target_path.isEmpty()) {
-      return false;
-    }
-  }
-
   QString error_message;
-  if (!saveConfigFile(target_path, &error_message)) {
-    QMessageBox::critical(this, "Save failed", error_message);
+  if (!saveCurrentConfig(false, &error_message)) {
+    if (!error_message.isEmpty()) {
+      QMessageBox::critical(this, "Save failed", error_message);
+    }
     return false;
   }
 
   return true;
+}
+
+void MainWindow::updateFooterActions() {
+  if (footer_actions_ == nullptr) {
+    return;
+  }
+
+  if (auto* save_button = footer_actions_->findChild<QPushButton*>("footerSaveButton")) {
+    save_button->setEnabled(dirty_ || current_config_path_.empty());
+  }
+  if (auto* apply_button = footer_actions_->findChild<QPushButton*>("footerApplyButton")) {
+    apply_button->setEnabled(dirty_ || current_config_path_.empty());
+  }
+  if (auto* cancel_button = footer_actions_->findChild<QPushButton*>("footerCancelButton")) {
+    cancel_button->setEnabled(dirty_);
+  }
+}
+
+bool MainWindow::saveCurrentConfig(bool force_prompt, QString* error_message) {
+  QString target_path = currentConfigPath();
+  if (force_prompt || target_path.isEmpty()) {
+    target_path = QFileDialog::getSaveFileName(
+        this,
+        force_prompt ? "Save config as" : "Save config",
+        currentConfigPath().isEmpty() ? "sure-smartie.json" : currentConfigPath(),
+        "JSON files (*.json)");
+    if (target_path.isEmpty()) {
+      if (error_message != nullptr) {
+        error_message->clear();
+      }
+      return false;
+    }
+  }
+
+  return saveConfigFile(target_path, error_message);
+}
+
+bool MainWindow::applyCurrentConfig(QString* error_message) {
+  if (!saveCurrentConfig(false, error_message)) {
+    return false;
+  }
+
+  metrics_service_dirty_ = true;
+  last_metrics_.clear();
+  preview_diagnostics_.clear();
+  resetRotationPreview();
+  refreshPreview(true);
+  statusBar()->showMessage("Config saved and preview refreshed", 2500);
+  return true;
+}
+
+void MainWindow::revertCurrentConfig() {
+  if (!dirty_) {
+    return;
+  }
+
+  if (current_config_path_.empty()) {
+    config_ = makeDefaultConfig();
+    metrics_service_dirty_ = true;
+    last_metrics_.clear();
+    preview_diagnostics_.clear();
+    rotation_manager_.reset();
+    syncUiFromConfig();
+    setDirty(false);
+    refreshPreview(true);
+    statusBar()->showMessage("Reverted to default buffer", 2500);
+    return;
+  }
+
+  QString error_message;
+  if (!loadConfigFile(currentConfigPath(), &error_message)) {
+    QMessageBox::critical(this, "Cancel failed", error_message);
+    return;
+  }
+
+  statusBar()->showMessage("Unsaved changes discarded", 2500);
 }
 
 void MainWindow::syncUiFromConfig() {

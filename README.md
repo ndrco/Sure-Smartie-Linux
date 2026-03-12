@@ -257,6 +257,11 @@ Current non-goals:
 The preview widget renders the LCD frame directly and understands custom bar glyphs,
 but it never opens the physical serial device.
 
+Detailed Russian guide for GUI-based configuration, screen design, built-in providers
+and plugin development:
+
+- [Docs/sure-smartie-gui-guide.md](Docs/sure-smartie-gui-guide.md)
+
 ## Plugin SDK
 
 After install, external plugins can use:
