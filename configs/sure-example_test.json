@@ -1,0 +1,42 @@
+{
+  "baudrate": 9600,
+  "device": "/dev/null",
+  "display": {
+    "backlight": true,
+    "brightness": 192,
+    "cols": 20,
+    "contrast": 128,
+    "rows": 4,
+    "type": "stdout"
+  },
+  "plugin_paths": [],
+  "providers": [
+    "cpu",
+    "gpu",
+    "ram",
+    "system"
+  ],
+  "refresh_ms": 1000,
+  "screens": [
+    {
+      "interval_ms": 1999,
+      "lines": [
+        "CPU {bar:cpu.load,6} {cpu.load}%",
+        "GPU {bar:gpu.load,6} {gpu.load}%",
+        "RAM {ram.percent}% {ram.used_gb}",
+        "{system.time} {system.hostname}"
+      ],
+      "name": "overview"
+    },
+    {
+      "interval_ms": 2000,
+      "lines": [
+        "C:{cpu.clock} {cpu.load}",
+        "",
+        "",
+        ""
+      ],
+      "name": "screen_2"
+    }
+  ]
+}

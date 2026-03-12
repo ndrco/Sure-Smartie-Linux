@@ -102,6 +102,7 @@ int main() {
           .interval = 0ms,
           .lines = {
               "{bar:cpu.load,x}",
+              "{at:0}",
               "{",
           },
       },
@@ -115,6 +116,7 @@ int main() {
   assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "screens[0].interval_ms"));
   assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "screens[0].lines[0]"));
   assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "screens[0].lines[1]"));
+  assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "screens[0].lines[2]"));
 
   MetricMap metrics{
       {"cpu.load", "42"},

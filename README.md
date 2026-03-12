@@ -231,6 +231,7 @@ The template engine also supports bar macros:
 
 - `{bar:cpu.load,6}` renders a 6-cell bar for values in the default range `0..100`
 - `{bar:gpu.mem_percent,8,100}` renders a bar with an explicit max value
+- `{at:12}` pads the line so the next output starts at column 12 (1-based)
 
 It also exposes a width estimator that is used by both CLI validation and the GUI line
 counters, so template-heavy lines are no longer flagged just because the raw source

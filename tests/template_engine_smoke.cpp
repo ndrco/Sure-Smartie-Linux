@@ -45,6 +45,16 @@ int main() {
   assert(static_cast<unsigned char>(bar_frame[0][4]) == 5);
   assert(static_cast<unsigned char>(bar_frame[0][5]) == 3);
 
+  sure_smartie::core::ScreenDefinition aligned_screen{
+      .name = "aligned",
+      .interval = std::chrono::milliseconds{5},
+      .lines = {"CPU {cpu.load}%{at:12}{ram.percent}%"},
+  };
+  const auto aligned_frame =
+      engine.render(aligned_screen, metrics, {.cols = 20, .rows = 1});
+  assert(aligned_frame.size() == 1);
+  assert(aligned_frame[0] == "CPU 42%    73%      ");
+
   sure_smartie::engine::ScreenManager manager({first, second});
   const auto start = std::chrono::steady_clock::now();
   assert(manager.current(start).name == "first");

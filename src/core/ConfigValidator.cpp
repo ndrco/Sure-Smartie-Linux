@@ -136,6 +136,14 @@ void validateTemplateLine(std::vector<Diagnostic>& diagnostics,
                         "bar macro max must be a positive number");
         }
       }
+    } else if (token.rfind("at:", 0) == 0) {
+      const auto column = parseInt(token.substr(3));
+      if (!column.has_value() || *column <= 0) {
+        addDiagnostic(diagnostics,
+                      DiagnosticSeverity::error,
+                      field_prefix,
+                      "at macro must be {at:column} with a positive column number");
+      }
     } else if (token.empty()) {
       addDiagnostic(diagnostics,
                     DiagnosticSeverity::error,

@@ -375,6 +375,8 @@ std::string CpuProvider::readCpuTemperature() {
 std::string CpuProvider::readCpuClock() {
   std::ifstream input("/proc/cpuinfo");
   std::string line;
+  double mhz_sum = 0.0;
+  std::size_t mhz_count = 0;
 
   while (std::getline(input, line)) {
     if (line.rfind("cpu MHz", 0) != 0) {
@@ -386,8 +388,16 @@ std::string CpuProvider::readCpuClock() {
       continue;
     }
 
-    const auto mhz = std::stod(trim(line.substr(delimiter + 1)));
-    return std::to_string(static_cast<int>(std::lround(mhz))) + "M";
+    try {
+      mhz_sum += std::stod(trim(line.substr(delimiter + 1)));
+      ++mhz_count;
+    } catch (...) {
+      continue;
+    }
+  }
+
+  if (mhz_count > 0) {
+    return std::to_string(static_cast<int>(std::lround(mhz_sum / mhz_count))) + "M";
   }
 
   return "--";

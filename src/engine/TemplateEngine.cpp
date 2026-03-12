@@ -123,6 +123,13 @@ std::optional<std::size_t> TemplateEngine::estimateRenderedWidth(
       }
 
       width += static_cast<std::size_t>(*bar_width);
+    } else if (key.rfind("at:", 0) == 0) {
+      const auto column = parseInt(key.substr(3));
+      if (!column.has_value() || *column <= 0) {
+        return std::nullopt;
+      }
+
+      width = std::max(width, static_cast<std::size_t>(*column - 1));
     } else if (key.empty()) {
       return std::nullopt;
     } else {
@@ -206,6 +213,16 @@ std::string TemplateEngine::renderLine(const std::string& line,
       }
 
       output.append(replacement);
+      index = end;
+      continue;
+    } else if (key.rfind("at:", 0) == 0) {
+      const auto column = parseInt(key.substr(3));
+      if (column.has_value() && *column > 0) {
+        const auto target = static_cast<std::size_t>(*column - 1);
+        if (output.size() < target) {
+          output.resize(target, ' ');
+        }
+      }
       index = end;
       continue;
     }
