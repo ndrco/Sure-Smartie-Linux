@@ -69,6 +69,32 @@ cmake -S . -B build -DSURE_SMARTIE_BUILD_GUI=OFF
 
 ## Install
 
+Recommended for most users:
+
+```bash
+./scripts/install-system.sh
+```
+
+This script:
+
+- configures and builds the project;
+- installs it into `/usr/local`;
+- installs the GUI launcher into the desktop applications menu when Qt GUI is built;
+- enables `sure-smartie-linux-root.service` by default;
+- updates the shared env file for the suspend/resume hook.
+
+To remove the program later:
+
+```bash
+sudo sure-smartie-uninstall
+```
+
+If you prefer the non-root service variant:
+
+```bash
+./scripts/install-system.sh --user-service
+```
+
 Staging install:
 
 ```bash
@@ -96,6 +122,17 @@ Run the GUI editor:
 ```bash
 ./build/sure-smartie-gui
 ```
+
+By default the GUI first tries the same installed config path used by the
+runtime/service:
+
+```text
+/usr/local/etc/sure-smartie-linux/config.json
+```
+
+If that file is missing, it falls back to
+`/usr/local/etc/sure-smartie-linux/config.json.example`, and only then to
+repo-local example configs for developer runs.
 
 Open a specific config in the GUI:
 
@@ -143,6 +180,8 @@ Set log verbosity:
 ## systemd
 
 The install step generates and installs `sure-smartie-linux.service`.
+It also generates `sure-smartie-linux-root.service` for systems where Intel RAPL
+`energy_uj` is readable only by root.
 It also installs `sure-smartie-linux.conf` into `sysusers.d`, which creates the
 `_sure-smartie` service user and adds it to `dialout`.
 It also installs:
@@ -159,6 +198,37 @@ sudo systemd-sysusers /usr/local/lib/sysusers.d/sure-smartie-linux.conf
 sudo systemctl enable --now sure-smartie-linux
 ```
 
+For simpler day-to-day installation on a desktop machine, prefer:
+
+```bash
+./scripts/install-system.sh
+```
+
+and for removal:
+
+```bash
+sudo sure-smartie-uninstall
+```
+
+If `cpu.power_w` stays `--` because `/sys/devices/virtual/powercap/.../energy_uj`
+is root-only on your distro, use the dedicated root unit instead of opening that
+sysfs node to all users:
+
+```bash
+sudo cmake --install build
+sudo systemctl daemon-reload
+sudo systemctl disable --now sure-smartie-linux 2>/dev/null || true
+sudo systemctl enable --now sure-smartie-linux-root
+```
+
+The root unit keeps the RAPL access scoped to the service itself. If you also use the
+installed suspend/resume hook, you can optionally set this in
+`/usr/local/etc/default/sure-smartie-linux`:
+
+```bash
+SURE_SMARTIE_SERVICE_NAME=sure-smartie-linux-root.service
+```
+
 The runtime first looks for `/usr/local/etc/sure-smartie-linux/config.json`.
 If that file is absent, it automatically falls back to
 `/usr/local/etc/sure-smartie-linux/config.json.example`, so a fresh install still
@@ -166,6 +236,13 @@ works before you create a custom config.
 
 If the service should run without root, ensure the selected user has access to the
 serial device, usually through the `dialout` group.
+
+The GUI preview is a regular desktop app and usually runs as your normal user, so it may
+still show `cpu.power_w = --` on Ubuntu/Debian systems that keep RAPL counters root-only.
+That does not prevent the root systemd service from showing the correct value on the LCD.
+
+On a normal service stop, `sure-smartie-linux` now clears the LCD and turns the
+backlight off, so the display does not stay lit after shutdown.
 
 For suspend/resume handling, the installed sleep hook now:
 
@@ -177,6 +254,27 @@ For suspend/resume handling, the installed sleep hook now:
 If you keep the runtime config in a non-default location, set `SURE_SMARTIE_CONFIG`
 inside `/usr/local/etc/default/sure-smartie-linux` so both the service and the
 sleep hook use the same file.
+
+### Installed service config
+
+After a system-wide install, the service uses:
+
+- `/usr/local/etc/default/sure-smartie-linux` as the shared environment file
+- `/usr/local/etc/sure-smartie-linux/config.json` as the main runtime config
+- `/usr/local/etc/sure-smartie-linux/config.json.example` as the fallback example
+
+Config lookup order:
+
+1. `SURE_SMARTIE_CONFIG` from `/usr/local/etc/default/sure-smartie-linux`, if set
+2. `/usr/local/etc/sure-smartie-linux/config.json`
+3. `/usr/local/etc/sure-smartie-linux/config.json.example`
+
+Typical edit flow:
+
+```bash
+sudoedit /usr/local/etc/sure-smartie-linux/config.json
+sudo systemctl restart sure-smartie-linux-root.service
+```
 
 The service logs clean single-line entries that work well with journald, for example:
 
@@ -199,6 +297,10 @@ level=info component=app msg="entering render loop" refresh_ms="1000" providers=
     "contrast": 128,
     "brightness": 192
   },
+  "cpu_fan": {
+    "rpm_path": "",
+    "max_rpm": 0
+  },
   "providers": ["cpu", "gpu", "ram", "system", "network"],
   "plugin_paths": [],
   "screens": [
@@ -216,6 +318,10 @@ level=info component=app msg="entering render loop" refresh_ms="1000" providers=
 }
 ```
 
+If your motherboard exposes the CPU fan through sysfs, set `cpu_fan.rpm_path` to that
+exact file and `cpu_fan.max_rpm` to the known fan maximum. `cpu.fan_rpm` is read directly
+from that path, and `cpu.fan_percent` is derived from `max_rpm`.
+
 ## Notes about the SURE protocol
 
 The current driver uses the commands validated in `Tests/sure_lcd_test.py` and in the vendor PDF:
@@ -232,6 +338,18 @@ The template engine also supports bar macros:
 - `{bar:cpu.load,6}` renders a 6-cell bar for values in the default range `0..100`
 - `{bar:gpu.mem_percent,8,100}` renders a bar with an explicit max value
 - `{at:12}` pads the line so the next output starts at column 12 (1-based)
+- `{glyph:name}` can also reference any user glyph declared in `custom_glyphs`
+
+User glyphs are stored as 5x8 row bitmasks:
+
+```json
+"custom_glyphs": [
+  {
+    "name": "heart",
+    "rows": [0, 10, 31, 31, 31, 14, 4, 0]
+  }
+]
+```
 
 It also exposes a width estimator that is used by both CLI validation and the GUI line
 counters, so template-heavy lines are no longer flagged just because the raw source
@@ -245,6 +363,8 @@ Current v1 capabilities:
 
 - open, save and save-as for runtime-compatible JSON configs
 - edit display settings, built-in providers, plugin paths and screen rotation data
+- configure an explicit CPU fan RPM sensor path and max RPM for `cpu.fan_*`
+- edit 5x8 custom LCD glyphs and save them into the runtime JSON config
 - live preview rendered from the shared `TemplateEngine`
 - live local metrics collected through the same built-in/plugin provider stack
 - validation panel powered by the shared `ConfigValidator`
@@ -255,8 +375,8 @@ Current non-goals:
 - systemd management
 - web UI
 
-The preview widget renders the LCD frame directly and understands custom bar glyphs,
-but it never opens the physical serial device.
+The preview widget renders the LCD frame directly and understands both built-in and
+user-defined glyph patterns, but it never opens the physical serial device.
 
 Detailed Russian guide for GUI-based configuration, screen design, built-in providers
 and plugin development:

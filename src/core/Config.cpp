@@ -1,5 +1,6 @@
 #include "sure_smartie/core/Config.hpp"
 
+#include <algorithm>
 #include <fstream>
 #include <stdexcept>
 #include <string>
@@ -57,6 +58,16 @@ AppConfig ConfigLoader::loadFromFile(const std::filesystem::path& path) {
     }
   }
 
+  if (document.contains("cpu_fan")) {
+    const auto& cpu_fan = document.at("cpu_fan");
+    if (cpu_fan.contains("rpm_path")) {
+      config.cpu_fan.rpm_path = cpu_fan.at("rpm_path").get<std::string>();
+    }
+    if (cpu_fan.contains("max_rpm")) {
+      config.cpu_fan.max_rpm = cpu_fan.at("max_rpm").get<int>();
+    }
+  }
+
   if (document.contains("providers")) {
     config.providers = document.at("providers").get<std::vector<std::string>>();
   }
@@ -64,6 +75,23 @@ AppConfig ConfigLoader::loadFromFile(const std::filesystem::path& path) {
   if (document.contains("plugin_paths")) {
     config.plugin_paths =
         document.at("plugin_paths").get<std::vector<std::string>>();
+  }
+
+  config.custom_glyphs.clear();
+  if (document.contains("custom_glyphs")) {
+    for (const auto& glyph_json : document.at("custom_glyphs")) {
+      CustomGlyphDefinition glyph;
+      glyph.name = glyph_json.value("name", "");
+      if (glyph_json.contains("rows")) {
+        const auto& rows = glyph_json.at("rows");
+        const auto limit =
+            std::min<std::size_t>(rows.size(), glyph.pattern.size());
+        for (std::size_t index = 0; index < limit; ++index) {
+          glyph.pattern[index] = rows.at(index).get<int>();
+        }
+      }
+      config.custom_glyphs.push_back(std::move(glyph));
+    }
   }
 
   config.screens.clear();

@@ -22,9 +22,10 @@ bool isBuiltinProviderName(std::string_view provider_name) {
   return std::find(names.begin(), names.end(), provider_name) != names.end();
 }
 
-std::unique_ptr<IProvider> createBuiltinProvider(std::string_view provider_name) {
+std::unique_ptr<IProvider> createBuiltinProvider(std::string_view provider_name,
+                                                 const core::AppConfig& config) {
   if (provider_name == "cpu") {
-    return std::make_unique<CpuProvider>();
+    return std::make_unique<CpuProvider>(config.cpu_fan);
   }
 
   if (provider_name == "ram") {
@@ -47,7 +48,8 @@ std::unique_ptr<IProvider> createBuiltinProvider(std::string_view provider_name)
 }
 
 std::vector<std::unique_ptr<IProvider>> createBuiltinProviders(
-    const std::vector<std::string>& provider_names) {
+    const std::vector<std::string>& provider_names,
+    const core::AppConfig& config) {
   std::vector<std::unique_ptr<IProvider>> providers;
   std::unordered_set<std::string> seen;
 
@@ -55,7 +57,7 @@ std::vector<std::unique_ptr<IProvider>> createBuiltinProviders(
     if (!seen.insert(provider_name).second) {
       continue;
     }
-    providers.push_back(createBuiltinProvider(provider_name));
+    providers.push_back(createBuiltinProvider(provider_name, config));
   }
 
   return providers;

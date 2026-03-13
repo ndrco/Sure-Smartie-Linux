@@ -10,6 +10,37 @@
 #include <QSizePolicy>
 
 namespace sure_smartie::gui {
+namespace {
+
+void paintCustomGlyph(QPainter& painter,
+                      const QRectF& cell_rect,
+                      const core::GlyphPattern& pattern) {
+  const qreal pixel_width = cell_rect.width() / static_cast<qreal>(core::kGlyphWidth);
+  const qreal pixel_height = cell_rect.height() / static_cast<qreal>(core::kGlyphHeight);
+  const qreal pixel_padding = std::max<qreal>(0.6, std::min(pixel_width, pixel_height) * 0.12);
+
+  painter.setPen(Qt::NoPen);
+  painter.setBrush(QColor("#d5f08a"));
+
+  for (std::size_t row = 0; row < core::kGlyphHeight; ++row) {
+    const int row_bits = std::clamp(pattern[row], 0, 0x1F);
+    for (std::size_t column = 0; column < core::kGlyphWidth; ++column) {
+      const int mask = 1 << static_cast<int>(core::kGlyphWidth - column - 1);
+      if ((row_bits & mask) == 0) {
+        continue;
+      }
+
+      const QRectF pixel_rect(
+          cell_rect.left() + static_cast<qreal>(column) * pixel_width + pixel_padding,
+          cell_rect.top() + static_cast<qreal>(row) * pixel_height + pixel_padding,
+          std::max<qreal>(1.5, pixel_width - pixel_padding * 2.0),
+          std::max<qreal>(1.5, pixel_height - pixel_padding * 2.0));
+      painter.drawRoundedRect(pixel_rect, 1.4, 1.4);
+    }
+  }
+}
+
+}  // namespace
 
 LcdPreviewWidget::LcdPreviewWidget(QWidget* parent)
     : QWidget(parent),
@@ -18,9 +49,12 @@ LcdPreviewWidget::LcdPreviewWidget(QWidget* parent)
   setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 }
 
-void LcdPreviewWidget::setFrame(core::DisplayGeometry geometry, core::Frame frame) {
+void LcdPreviewWidget::setFrame(core::DisplayGeometry geometry,
+                                core::Frame frame,
+                                core::GlyphSlotBank glyphs) {
   geometry_ = geometry;
   frame_ = std::move(frame);
+  glyphs_ = std::move(glyphs);
   frame_.resize(geometry_.rows, std::string(geometry_.cols, ' '));
   for (auto& line : frame_) {
     if (line.size() < geometry_.cols) {
@@ -151,19 +185,8 @@ void LcdPreviewWidget::paintGlyph(QPainter& painter,
                                   const QRectF& cell_rect,
                                   char symbol) const {
   const auto code = static_cast<unsigned char>(symbol);
-  if (code >= 1 && code <= 5) {
-    const qreal fraction = static_cast<qreal>(code) / 5.0;
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(213, 240, 138, 42));
-    painter.drawRoundedRect(cell_rect, 2.5, 2.5);
-
-    const QRectF fill_rect(
-        cell_rect.left(),
-        cell_rect.top(),
-        std::max<qreal>(2.0, cell_rect.width() * fraction),
-        cell_rect.height());
-    painter.setBrush(QColor("#d5f08a"));
-    painter.drawRoundedRect(fill_rect, 2.0, 2.0);
+  if (code < glyphs_.size() && glyphs_[code].active) {
+    paintCustomGlyph(painter, cell_rect, glyphs_[code].pattern);
     return;
   }
 

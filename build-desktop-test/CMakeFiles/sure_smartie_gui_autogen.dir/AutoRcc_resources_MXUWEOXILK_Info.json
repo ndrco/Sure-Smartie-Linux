@@ -1,0 +1,30 @@
+{
+	"BUILD_DIR" : "/home/re/src/Sure-Smartie-linux/build-desktop-test/sure_smartie_gui_autogen",
+	"CMAKE_BINARY_DIR" : "/home/re/src/Sure-Smartie-linux/build-desktop-test",
+	"CMAKE_CURRENT_BINARY_DIR" : "/home/re/src/Sure-Smartie-linux/build-desktop-test",
+	"CMAKE_CURRENT_SOURCE_DIR" : "/home/re/src/Sure-Smartie-linux",
+	"CMAKE_SOURCE_DIR" : "/home/re/src/Sure-Smartie-linux",
+	"GENERATOR" : "Unix Makefiles",
+	"INCLUDE_DIR" : "/home/re/src/Sure-Smartie-linux/build-desktop-test/sure_smartie_gui_autogen/include",
+	"INPUTS" : 
+	[
+		"/home/re/src/Sure-Smartie-linux/assets/icons/sure-smartie-gui-256.png",
+		"/home/re/src/Sure-Smartie-linux/assets/icons/sure-smartie-gui-48.png",
+		"/home/re/src/Sure-Smartie-linux/assets/icons/sure-smartie-gui-64.png",
+		"/home/re/src/Sure-Smartie-linux/assets/icons/sure-smartie-gui-16.png",
+		"/home/re/src/Sure-Smartie-linux/assets/icons/sure-smartie-gui-128.png",
+		"/home/re/src/Sure-Smartie-linux/assets/icons/sure-smartie-gui-32.png",
+		"/home/re/src/Sure-Smartie-linux/assets/icons/sure-smartie-gui-512.png",
+		"/home/re/src/Sure-Smartie-linux/assets/icons/sure-smartie-gui-24.png"
+	],
+	"LOCK_FILE" : "/home/re/src/Sure-Smartie-linux/build-desktop-test/CMakeFiles/sure_smartie_gui_autogen.dir/AutoRcc_resources_MXUWEOXILK_Lock.lock",
+	"MULTI_CONFIG" : false,
+	"OPTIONS" : [ "-name", "resources" ],
+	"OUTPUT_CHECKSUM" : "MXUWEOXILK",
+	"OUTPUT_NAME" : "qrc_resources.cpp",
+	"RCC_EXECUTABLE" : "/usr/lib/qt6/libexec/rcc",
+	"RCC_LIST_OPTIONS" : [ "--list" ],
+	"SETTINGS_FILE" : "/home/re/src/Sure-Smartie-linux/build-desktop-test/CMakeFiles/sure_smartie_gui_autogen.dir/AutoRcc_resources_MXUWEOXILK_Used.txt",
+	"SOURCE" : "/home/re/src/Sure-Smartie-linux/src/gui/resources.qrc",
+	"VERBOSITY" : 0
+}

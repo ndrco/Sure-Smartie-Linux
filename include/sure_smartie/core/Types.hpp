@@ -1,9 +1,9 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
-#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -12,6 +12,36 @@ namespace sure_smartie::core {
 
 using MetricMap = std::unordered_map<std::string, std::string>;
 using Frame = std::vector<std::string>;
+using GlyphPattern = std::array<int, 8>;
+
+inline constexpr std::size_t kGlyphSlotCount = 8;
+inline constexpr std::size_t kGlyphWidth = 5;
+inline constexpr std::size_t kGlyphHeight = 8;
+
+inline constexpr char kGlyphBar1 = '\x01';
+inline constexpr char kGlyphBar2 = '\x02';
+inline constexpr char kGlyphBar3 = '\x03';
+inline constexpr char kGlyphBar4 = '\x04';
+inline constexpr char kGlyphBar5 = '\x05';
+inline constexpr char kGlyphBarBase = '\x06';
+
+struct CustomGlyphDefinition {
+  std::string name;
+  GlyphPattern pattern{};
+};
+
+struct ActiveGlyphSlot {
+  bool active{false};
+  std::string name;
+  GlyphPattern pattern{};
+};
+
+using GlyphSlotBank = std::array<ActiveGlyphSlot, kGlyphSlotCount>;
+
+struct RenderedFrame {
+  Frame frame;
+  GlyphSlotBank glyphs;
+};
 
 enum class DiagnosticSeverity {
   info,
@@ -52,13 +82,20 @@ struct ScreenDefinition {
   std::vector<std::string> lines;
 };
 
+struct CpuFanConfig {
+  std::string rpm_path;
+  int max_rpm{0};
+};
+
 struct AppConfig {
   std::string device{"/dev/ttyUSB1"};
   int baudrate{9600};
   std::chrono::milliseconds refresh_interval{1000};
   DisplayConfig display;
+  CpuFanConfig cpu_fan;
   std::vector<std::string> providers{"cpu", "gpu", "ram", "system", "network"};
   std::vector<std::string> plugin_paths;
+  std::vector<CustomGlyphDefinition> custom_glyphs;
   std::vector<ScreenDefinition> screens;
 };
 

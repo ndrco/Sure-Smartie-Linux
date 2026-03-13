@@ -1,0 +1,18 @@
+Start testing: Mar 13 22:57 MSK
+----------------------------------------------------------
+6/6 Testing: gui_smoke
+6/6 Test: gui_smoke
+Command: "/home/re/src/Sure-Smartie-linux/build-desktop-test/gui_smoke"
+Directory: /home/re/src/Sure-Smartie-linux
+"gui_smoke" start time: Mar 13 22:57 MSK
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.41 sec
+----------------------------------------------------------
+Test Passed.
+"gui_smoke" end time: Mar 13 22:57 MSK
+"gui_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Mar 13 22:57 MSK

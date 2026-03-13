@@ -1,0 +1,1 @@
+/usr/bin/c++ "CMakeFiles/sure-smartie-linux.dir/src/main.cpp.o" -o sure-smartie-linux  libsure_smartie_core.a -ldl 

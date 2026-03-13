@@ -61,15 +61,34 @@ cmake --build build
 /usr/local/etc/sure-smartie-linux/config.json.example
 ```
 
-При запуске GUI без аргумента пути он пытается открыть конфиг из рабочей копии репозитория:
+При запуске GUI без аргумента пути он теперь использует такой порядок:
 
-1. `configs/stdout-example.json`
-2. `configs/sure-example.json`
-
-То есть `sure-smartie-gui` по умолчанию не ищет установленный системный `config.json`,
-а работает с ближайшим примером из проекта, если вы запускаете его из дерева исходников.
+1. `SURE_SMARTIE_CONFIG`, если переменная окружения задана;
+2. `/usr/local/etc/sure-smartie-linux/config.json`;
+3. `/usr/local/etc/sure-smartie-linux/config.json.example`;
+4. `configs/sure-example.json`;
+5. `configs/stdout-example.json`.
 
 ### 3. Применение на реальном устройстве
+
+Самый простой вариант установки для обычного пользователя:
+
+```bash
+./scripts/install-system.sh
+```
+
+Этот скрипт сам:
+
+- соберёт проект;
+- установит его в `/usr/local`;
+- включит `sure-smartie-linux-root.service` по умолчанию;
+- настроит env-файл для sleep hook.
+
+Для удаления:
+
+```bash
+sudo sure-smartie-uninstall
+```
 
 После сохранения конфига:
 
@@ -82,6 +101,33 @@ cmake --build build
 ```bash
 ./build/sure-smartie-linux --config path/to/config.json --validate-config
 ./build/sure-smartie-linux --config path/to/config.json --once
+```
+
+### 4. Рекомендуемый systemd-режим для `cpu.power_w`
+
+Если на вашей системе файл Intel RAPL `energy_uj` читается только root, безопаснее не
+ослаблять права на sysfs, а запускать именно рантайм как отдельный root-service.
+
+В репозитории для этого подготовлен готовый unit:
+
+```text
+packaging/systemd/sure-smartie-linux-root.service.in
+```
+
+После установки:
+
+```bash
+sudo cmake --install build
+sudo systemctl daemon-reload
+sudo systemctl disable --now sure-smartie-linux 2>/dev/null || true
+sudo systemctl enable --now sure-smartie-linux-root
+```
+
+Если используется установленный sleep hook, удобно прописать в
+`/usr/local/etc/default/sure-smartie-linux`:
+
+```bash
+SURE_SMARTIE_SERVICE_NAME=sure-smartie-linux-root.service
 ```
 
 ## Пошаговая настройка в GUI
@@ -123,6 +169,20 @@ cmake --build build
 
 По умолчаниию устанновлено `device = /dev/null` - это безопасная заглушка вместо реального serial-порта.
 В режиме `stdout` приложение не должно отправлять команды на физический дисплей; и `/dev/null` явно показывает, что конфиг используется только для preview, тестов и отладки. Для настоящего индикатора здесь нужно указывать реальный путь, например `/dev/ttyUSB1` или `/dev/serial/by-id/...`.
+
+### CPU Fan Sensor
+
+Блок задаёт явный источник для `cpu.fan_rpm` и `cpu.fan_percent`.
+
+- `RPM path`: точный путь к sysfs-файлу, например `/sys/class/hwmon/hwmon9/fan3_input`;
+- `Max RPM`: максимум оборотов для этого вентилятора.
+
+Логика простая:
+
+- `cpu.fan_rpm` читается напрямую из `RPM path`;
+- `cpu.fan_percent` считается как `rpm / max_rpm * 100`;
+- если `RPM path` не задан или файл не читается, обе метрики будут `--`;
+- если `Max RPM = 0`, то `cpu.fan_rpm` продолжит работать, а `cpu.fan_percent` будет `--`.
 
 ### Providers & Plugins
 
@@ -185,6 +245,13 @@ cmake --build build
 - числа и бары не “съедают” важную информацию;
 - при длинном hostname или IP остаётся полезная часть текста;
 - screen order и interval выглядят логично в rotation preview.
+
+Важно для `cpu.power_w`:
+
+- на Ubuntu/Debian доступ к Intel RAPL `energy_uj` часто закрыт для обычного пользователя;
+- поэтому `sure-smartie-gui`, запущенный из desktop-session, может показывать `cpu.power_w` как `--`;
+- при этом установленный `sure-smartie-linux-root.service` может читать RAPL и выводить
+  корректную мощность на реальный LCD.
 
 ### Validation
 
@@ -287,7 +354,63 @@ CPU 100% {at:12}14%
 
 Во всех трёх случаях вторая метрика начнёт печататься с одного и того же знакоместа.
 
-### 4. Обрезание и дополнение
+### 4. Glyph-макросы
+
+Формат:
+
+```text
+{glyph:name}
+```
+
+Пример:
+
+```text
+CPU {cpu.temp}C {glyph:heart}
+GPU {gpu.power_w}W {glyph:bolt}
+```
+
+Особенности:
+
+- glyph занимает ровно одно знакоместо;
+- один и тот же glyph работает в GUI-preview, `stdout` и на реальном SURE LCD;
+- glyph должен быть явно определён в `custom_glyphs`.
+
+### 5. Пользовательские glyph-ы
+
+В GUI появился отдельный блок `Custom Glyphs`.
+
+Что в нём можно сделать:
+
+- создать именованный glyph;
+- нарисовать шаблон 5x8 кликами по сетке;
+- сохранить glyph прямо в JSON-конфиг;
+- затем использовать его в строках экрана как `{glyph:имя}`.
+
+Как это хранится в конфиге:
+
+```json
+"custom_glyphs": [
+  {
+    "name": "heart",
+    "rows": [0, 10, 31, 31, 31, 14, 4, 0]
+  }
+]
+```
+
+Где:
+
+- `name` используется в макросе `{glyph:name}`;
+- `rows` содержит 8 строк glyph-а сверху вниз;
+- каждое число в `rows` должно быть в диапазоне `0..31`, потому что у LCD glyph шириной 5 пикселей.
+
+Ограничения LCD:
+
+- одновременно в памяти дисплея есть только 8 пользовательских слотов;
+- любой `{bar:...}` резервирует ещё 6 слотов под уровни заполнения;
+- оставшиеся слоты можно занять пользовательскими glyph-ами;
+- если на одном экране glyph-ов больше, чем доступно слотов, GUI покажет ошибку в `Validation`.
+
+### 6. Обрезание и дополнение
 
 После рендеринга строка:
 
@@ -372,7 +495,7 @@ TX 14.9G
 Пример вывода:
 
 ```text
-CPU 61C 72.4W
+CPU 61C 72W
 CPUF 1180rpm
 GPU 49C 88.5W
 G-F 37%
@@ -490,14 +613,15 @@ workstation
 - `/proc/stat`
 - `/sys/class/thermal`
 - `/proc/cpuinfo`
+- `/sys/devices/virtual/powercap/intel-rapl/.../energy_uj`
 
 Ключи:
 
 - `cpu.load`: загрузка CPU в процентах, целое число `0..100`;
 - `cpu.temp`: температура CPU в `C`, строка вида `61`, либо `--`, если датчик не найден;
-- `cpu.clock`: усреднённая текущая частота по доступным строкам `cpu MHz` из `/proc/cpuinfo`,
-  строка вида `4850M`, либо `--`;
-- `cpu.power_w`: потребляемая мощность CPU в ваттах, строка вида `72.4`, либо `--`;
+- `cpu.clock`: максимум из текущих значений `cpu MHz` в `/proc/cpuinfo`, строка вида `5300M`,
+  либо `--`;
+- `cpu.power_w`: потребляемая мощность CPU в ваттах, строка вида `72`, либо `--`;
 - `cpu.fan_rpm`: скорость вентилятора CPU в оборотах в минуту, строка вида `1180`, либо `--`;
 - `cpu.fan_percent`: скорость вентилятора CPU в процентах, строка вида `46`, либо `--`.
 
@@ -505,13 +629,24 @@ workstation
 
 - `cpu.load` рассчитывается по разнице между двумя чтениями `/proc/stat`;
 - на первом цикле после старта загрузка может быть `0`, потому что предыдущей выборки ещё нет;
-- `cpu.clock` больше не берётся из первого попавшегося логического ядра, а усредняется по
-  доступным ядрам, чтобы значение меньше дёргалось;
+- `cpu.clock` рассчитывается как максимум из текущих значений `cpu MHz` по всем ядрам в
+  `/proc/cpuinfo`;
+- если `cpu MHz` недоступен, используется fallback через `cpufreq` sysfs;
 - поиск температуры эвристический, поэтому на некоторых системах может вернуться `--`;
-- `cpu.power_w` читается из `powercap` или `hwmon`, а при отсутствии мгновенного значения
-  может оцениваться по изменению `energy_uj` между циклами;
-- `cpu.fan_rpm` и `cpu.fan_percent` зависят от того, экспортирует ли материнская плата или EC
-  соответствующие `fan*_input` и `pwm*` в `/sys/class/hwmon`.
+- `cpu.power_w` считается по изменению `energy_uj` в Intel RAPL package zone между двумя циклами
+  рендера: `delta(energy_uj) / delta(time)`;
+- на первом цикле после старта `cpu.power_w` может быть `--`, потому что ещё нет предыдущей
+  выборки энергии;
+- если `energy_uj` доступен только root, то в GUI-preview `cpu.power_w` останется `--`;
+- для реального дисплея в этом случае лучше использовать `sure-smartie-linux-root.service`;
+- `cpu.fan_rpm` читается из `cpu_fan.rpm_path`;
+- `cpu.fan_percent` считается только от `cpu_fan.max_rpm`, если он больше нуля.
+
+При штатном завершении `sure-smartie-linux`:
+
+- дисплей очищается;
+- подсветка выключается;
+- это особенно полезно для systemd-остановки и выключения компьютера.
 
 ### `gpu`
 
@@ -525,11 +660,12 @@ workstation
 - `gpu.name`: имя GPU;
 - `gpu.vendor`: `nvidia`, `amd`, `intel` или `gpu`;
 - `gpu.load`: загрузка GPU в процентах;
+- `gpu.clock`: текущая частота ядра GPU, строка вида `2340M`, либо `--`;
 - `gpu.temp`: температура GPU;
 - `gpu.mem_used`: занятая видеопамять, строка вида `3.1G`;
 - `gpu.mem_total`: общий объём видеопамяти, строка вида `12.0G`;
 - `gpu.mem_percent`: процент использования VRAM;
-- `gpu.power_w`: потребляемая мощность GPU в ваттах, строка вида `88.5`, либо `--`;
+- `gpu.power_w`: потребляемая мощность GPU в ваттах, строка вида `89`, либо `--`;
 - `gpu.fan_rpm`: скорость вентилятора GPU в оборотах в минуту, строка вида `1320`, либо `--`;
 - `gpu.fan_percent`: скорость вентилятора GPU в процентах, строка вида `37`, либо `--`.
 
@@ -538,8 +674,8 @@ workstation
 - если метрика недоступна, обычно возвращается `--`;
 - на NVIDIA точность и полнота данных зависят от `nvidia-smi`;
 - на AMD/Intel набор доступных полей зависит от sysfs и драйвера;
-- `gpu.power_w` и `gpu.fan_percent` на NVIDIA обычно доступны через `nvidia-smi`;
-- `gpu.fan_rpm`, а также power и fan на AMD/Intel читаются через `hwmon` под `/sys/class/drm`;
+- `gpu.clock`, `gpu.power_w` и `gpu.fan_percent` на NVIDIA обычно доступны через `nvidia-smi`;
+- `gpu.clock`, `gpu.fan_rpm`, а также power и fan на AMD/Intel читаются через `hwmon` и sysfs под `/sys/class/drm`;
 - для компактных экранов не стоит всегда выводить `gpu.name`, оно может быть слишком длинным.
 
 ### `ram`
@@ -880,6 +1016,10 @@ LCD маленький, поэтому метрики должны быть го
     "backlight": true,
     "contrast": 128,
     "brightness": 192
+  },
+  "cpu_fan": {
+    "rpm_path": "/sys/class/hwmon/hwmon9/fan3_input",
+    "max_rpm": 1800
   },
   "providers": ["cpu", "ram", "system"],
   "plugin_paths": [],

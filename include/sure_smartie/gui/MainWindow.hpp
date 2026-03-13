@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -19,6 +20,7 @@ class QLabel;
 class QLineEdit;
 class QListWidget;
 class QListWidgetItem;
+class QPushButton;
 class QSpinBox;
 class QTimer;
 class QVBoxLayout;
@@ -67,13 +69,17 @@ class MainWindow : public QMainWindow {
 
   void syncUiFromConfig();
   void syncDisplaySectionFromConfig();
+  void syncCpuFanSectionFromConfig();
   void syncProvidersSectionFromConfig();
   void syncPluginSectionFromConfig();
+  void syncCustomGlyphSectionFromConfig();
   void syncScreensSectionFromConfig();
   void syncScreenEditorFromSelection();
+  void syncCustomGlyphEditorFromSelection();
   void rebuildLineEditors();
   void updateLineLabels();
   void updatePreviewScreenChoices();
+  void updateCustomGlyphTokenHint();
   void updateValidationList();
 
   void rebuildMetricsService();
@@ -87,6 +93,10 @@ class MainWindow : public QMainWindow {
   void removeSelectedScreen();
   void duplicateSelectedScreen();
   void moveSelectedScreen(int delta);
+  int selectedCustomGlyphIndex() const;
+  void setSelectedCustomGlyph(int index);
+  void addCustomGlyph();
+  void removeSelectedCustomGlyph();
   void addPluginPaths();
   void removeSelectedPluginPath();
   void focusFieldPath(const QString& field_path);
@@ -121,9 +131,16 @@ class MainWindow : public QMainWindow {
   QCheckBox* backlight_check_{nullptr};
   QSpinBox* contrast_spin_{nullptr};
   QSpinBox* brightness_spin_{nullptr};
+  QLineEdit* cpu_fan_rpm_path_edit_{nullptr};
+  QSpinBox* cpu_fan_max_rpm_spin_{nullptr};
 
   std::vector<std::pair<std::string, QCheckBox*>> provider_checks_;
   QListWidget* plugin_paths_list_{nullptr};
+  QListWidget* custom_glyphs_list_{nullptr};
+  QLineEdit* custom_glyph_name_edit_{nullptr};
+  QLabel* custom_glyph_token_label_{nullptr};
+  std::array<std::array<QPushButton*, core::kGlyphWidth>, core::kGlyphHeight>
+      custom_glyph_buttons_{};
   QListWidget* screens_list_{nullptr};
   QLineEdit* screen_name_edit_{nullptr};
   QSpinBox* screen_interval_spin_{nullptr};

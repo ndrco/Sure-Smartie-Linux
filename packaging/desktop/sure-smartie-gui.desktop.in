@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Sure Smartie GUI
+GenericName=LCD display configurator
+Comment=Configure SURE LCD Smartie displays and preview screens
+TryExec=@CMAKE_INSTALL_FULL_BINDIR@/sure-smartie-gui
+Exec=@CMAKE_INSTALL_FULL_BINDIR@/sure-smartie-gui %f
+Icon=sure-smartie-gui
+Terminal=false
+StartupNotify=true
+StartupWMClass=sure-smartie-gui
+Categories=Utility;Qt;
+Keywords=lcd;smartie;monitoring;system;serial;

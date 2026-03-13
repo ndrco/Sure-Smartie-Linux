@@ -21,6 +21,7 @@ class App {
  private:
   MetricMap collectMetrics();
   void renderOnce();
+  void shutdownDisplay();
 
   AppConfig config_;
   RuntimeOptions options_;

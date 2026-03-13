@@ -21,8 +21,20 @@ nlohmann::json toJson(const AppConfig& config) {
       {"contrast", config.display.contrast},
       {"brightness", config.display.brightness},
   };
+  document["cpu_fan"] = {
+      {"rpm_path", config.cpu_fan.rpm_path},
+      {"max_rpm", config.cpu_fan.max_rpm},
+  };
   document["providers"] = config.providers;
   document["plugin_paths"] = config.plugin_paths;
+  document["custom_glyphs"] = nlohmann::json::array();
+
+  for (const auto& glyph : config.custom_glyphs) {
+    document["custom_glyphs"].push_back({
+        {"name", glyph.name},
+        {"rows", glyph.pattern},
+    });
+  }
 
   document["screens"] = nlohmann::json::array();
   for (const auto& screen : config.screens) {

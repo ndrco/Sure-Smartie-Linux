@@ -14,9 +14,11 @@ struct LcdPreviewWidgetTestAccess;
 
 class LcdPreviewWidget : public QWidget {
  public:
-  explicit LcdPreviewWidget(QWidget* parent = nullptr);
+ explicit LcdPreviewWidget(QWidget* parent = nullptr);
 
-  void setFrame(core::DisplayGeometry geometry, core::Frame frame);
+  void setFrame(core::DisplayGeometry geometry,
+                core::Frame frame,
+                core::GlyphSlotBank glyphs = {});
   const core::Frame& frame() const;
   QString lineText(int row) const;
 
@@ -34,6 +36,7 @@ class LcdPreviewWidget : public QWidget {
 
   core::DisplayGeometry geometry_;
   core::Frame frame_;
+  core::GlyphSlotBank glyphs_;
 };
 
 }  // namespace sure_smartie::gui

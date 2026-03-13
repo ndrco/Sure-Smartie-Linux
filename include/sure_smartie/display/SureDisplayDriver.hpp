@@ -25,11 +25,10 @@ class SureDisplayDriver : public IDisplay {
   void setBacklight(bool on) override;
   void setContrast(std::uint8_t value) override;
   void setBrightness(std::uint8_t value) override;
-  void uploadCustomCharacter(std::uint8_t index,
+ void uploadCustomCharacter(std::uint8_t index,
                              const std::array<std::uint8_t, 8>& pattern) override;
 
  private:
-  void uploadBuiltInGlyphs();
   static std::string sanitizeText(std::string text, std::size_t width);
   void writeLine(std::size_t row, const std::string& text);
   void writeBytes(std::initializer_list<std::uint8_t> bytes);

@@ -1,0 +1,21 @@
+[Unit]
+Description=Sure Smartie Linux LCD service (root for Intel RAPL access)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-@SURE_SMARTIE_ENV_FILE@
+StateDirectory=sure-smartie-linux
+LogsDirectory=sure-smartie-linux
+WorkingDirectory=/var/lib/sure-smartie-linux
+StandardOutput=journal
+StandardError=journal
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/sure-smartie-linux
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

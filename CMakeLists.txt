@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_AUTORCC ON)
 
 include(CTest)
 include(CMakePackageConfigHelpers)
@@ -47,6 +48,12 @@ configure_file(
 )
 
 configure_file(
+  packaging/systemd/sure-smartie-linux-root.service.in
+  ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-linux-root.service
+  @ONLY
+)
+
+configure_file(
   packaging/systemd/sure-smartie-linux-sleep.sh.in
   ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-linux-sleep.sh
   @ONLY
@@ -77,6 +84,7 @@ add_library(
   src/core/Config.cpp
   src/core/ConfigSerializer.cpp
   src/core/ConfigValidator.cpp
+  src/core/GlyphSupport.cpp
   src/core/Logger.cpp
   src/core/MetricsSnapshotService.cpp
   src/core/PreviewFrameRenderer.cpp
@@ -137,9 +145,16 @@ target_compile_definitions(
 if(SURE_SMARTIE_BUILD_GUI)
   find_package(Qt6 COMPONENTS Core Gui Widgets QUIET)
   if(Qt6_FOUND)
+    configure_file(
+      packaging/desktop/sure-smartie-gui.desktop.in
+      ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-gui.desktop
+      @ONLY
+    )
+
     add_library(
       sure_smartie_gui
       STATIC
+      src/gui/resources.qrc
       src/gui/LcdPreviewWidget.cpp
       src/gui/MainWindow.cpp
     )
@@ -169,6 +184,11 @@ if(SURE_SMARTIE_BUILD_GUI)
     add_executable(
       sure-smartie-gui
       src/gui/main.cpp
+    )
+    target_compile_definitions(
+      sure-smartie-gui
+      PRIVATE
+        SURE_SMARTIE_DEFAULT_CONFIG_PATH="${CMAKE_INSTALL_FULL_SYSCONFDIR}/sure-smartie-linux/config.json"
     )
     target_link_libraries(
       sure-smartie-gui
@@ -229,12 +249,31 @@ install(
     README.md
   DESTINATION ${CMAKE_INSTALL_DATADIR}/sure-smartie-linux/examples
 )
+if(TARGET sure-smartie-gui)
+  install(
+    FILES assets/icons/sure-smartie-gui.svg
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+    RENAME sure-smartie-gui.svg
+  )
+  foreach(icon_size IN ITEMS 16 24 32 48 64 128 256 512)
+    install(
+      FILES assets/icons/sure-smartie-gui-${icon_size}.png
+      DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${icon_size}x${icon_size}/apps
+      RENAME sure-smartie-gui.png
+    )
+  endforeach()
+  install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-gui.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+  )
+endif()
 install(
   DIRECTORY sdk/example-plugin/
   DESTINATION ${CMAKE_INSTALL_DATADIR}/sure-smartie-linux/sdk/example-plugin
 )
 install(
   FILES ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-linux.service
+        ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-linux-root.service
   DESTINATION ${SURE_SMARTIE_SYSTEMD_UNIT_DIR}
 )
 install(

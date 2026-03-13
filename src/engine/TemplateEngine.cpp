@@ -1,10 +1,15 @@
 #include "sure_smartie/engine/TemplateEngine.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <charconv>
 #include <cmath>
 #include <optional>
+#include <string_view>
+#include <unordered_map>
+
+#include "sure_smartie/core/GlyphSupport.hpp"
 
 namespace sure_smartie::engine {
 namespace {
@@ -55,27 +60,123 @@ std::optional<int> parseInt(const std::string& value) {
   return parsed;
 }
 
+struct ScreenBuiltInUsage {
+  bool uses_bar{false};
+};
+
+ScreenBuiltInUsage scanBuiltInUsage(const core::ScreenDefinition& screen) {
+  ScreenBuiltInUsage usage;
+
+  for (const auto& line : screen.lines) {
+    for (std::size_t index = 0; index < line.size(); ++index) {
+      if (line[index] != '{') {
+        continue;
+      }
+
+      const auto end = line.find('}', index + 1);
+      if (end == std::string::npos) {
+        return usage;
+      }
+
+      const auto token = line.substr(index + 1, end - index - 1);
+      if (token.rfind("bar:", 0) == 0) {
+        usage.uses_bar = true;
+      }
+
+      index = end;
+    }
+  }
+
+  return usage;
+}
+
 }  // namespace
+
+struct TemplateEngine::RenderContext {
+  explicit RenderContext(const core::ScreenDefinition& screen,
+                         const std::vector<core::CustomGlyphDefinition>& glyph_list)
+      : custom_glyphs(glyph_list) {
+    const auto builtins = scanBuiltInUsage(screen);
+    if (builtins.uses_bar) {
+      glyphs[1] = {.active = true, .name = "bar1", .pattern = core::barGlyphPattern(1)};
+      glyphs[2] = {.active = true, .name = "bar2", .pattern = core::barGlyphPattern(2)};
+      glyphs[3] = {.active = true, .name = "bar3", .pattern = core::barGlyphPattern(3)};
+      glyphs[4] = {.active = true, .name = "bar4", .pattern = core::barGlyphPattern(4)};
+      glyphs[5] = {.active = true, .name = "bar5", .pattern = core::barGlyphPattern(5)};
+      glyphs[6] = {.active = true, .name = "bar_base", .pattern = core::barGlyphPattern(0)};
+    }
+  }
+
+  std::optional<char> resolveGlyph(std::string_view raw_name) {
+    const auto glyph_name = trim(std::string(raw_name));
+    if (const auto it = user_slots.find(glyph_name); it != user_slots.end()) {
+      return static_cast<char>(it->second);
+    }
+
+    const auto pattern = core::findCustomGlyphPattern(glyph_name, custom_glyphs);
+    if (!pattern.has_value()) {
+      return std::nullopt;
+    }
+
+    for (std::size_t slot = 0; slot < glyphs.size(); ++slot) {
+      if (glyphs[slot].active) {
+        continue;
+      }
+
+      glyphs[slot] = {
+          .active = true,
+          .name = glyph_name,
+          .pattern = *pattern,
+      };
+      user_slots[glyph_name] = static_cast<std::uint8_t>(slot);
+      return static_cast<char>(slot);
+    }
+
+    return std::nullopt;
+  }
+
+  core::GlyphSlotBank glyphs;
+  const std::vector<core::CustomGlyphDefinition>& custom_glyphs;
+  std::unordered_map<std::string, std::uint8_t> user_slots;
+};
 
 core::Frame TemplateEngine::render(const core::ScreenDefinition& screen,
                                    const core::MetricMap& metrics,
                                    const core::DisplayGeometry& geometry) const {
-  core::Frame frame;
-  frame.reserve(geometry.rows);
+  return render(screen, metrics, geometry, {});
+}
+
+core::Frame TemplateEngine::render(
+    const core::ScreenDefinition& screen,
+    const core::MetricMap& metrics,
+    const core::DisplayGeometry& geometry,
+    const std::vector<core::CustomGlyphDefinition>& custom_glyphs) const {
+  return renderDetailed(screen, metrics, geometry, custom_glyphs).frame;
+}
+
+core::RenderedFrame TemplateEngine::renderDetailed(
+    const core::ScreenDefinition& screen,
+    const core::MetricMap& metrics,
+    const core::DisplayGeometry& geometry,
+    const std::vector<core::CustomGlyphDefinition>& custom_glyphs) const {
+  RenderContext context(screen, custom_glyphs);
+  core::RenderedFrame rendered;
+  rendered.frame.reserve(geometry.rows);
 
   for (std::size_t row = 0; row < geometry.rows; ++row) {
     const std::string source =
         row < screen.lines.size() ? screen.lines[row] : std::string{};
-    frame.push_back(fitToWidth(renderLine(source, metrics), geometry.cols));
+    rendered.frame.push_back(fitToWidth(renderLine(source, metrics, context), geometry.cols));
   }
 
-  return frame;
+  rendered.glyphs = context.glyphs;
+  return rendered;
 }
 
 std::string TemplateEngine::fitToWidth(std::string text, std::size_t width) {
   for (char& symbol : text) {
     const auto code = static_cast<unsigned char>(symbol);
-    if (std::iscntrl(code) && (code == 0 || code > 7)) {
+    if (std::iscntrl(code) && code >= static_cast<unsigned char>(core::kGlyphSlotCount)) {
       symbol = ' ';
     }
   }
@@ -123,6 +224,11 @@ std::optional<std::size_t> TemplateEngine::estimateRenderedWidth(
       }
 
       width += static_cast<std::size_t>(*bar_width);
+    } else if (key.rfind("glyph:", 0) == 0) {
+      if (trim(key.substr(6)).empty()) {
+        return std::nullopt;
+      }
+      width += 1;
     } else if (key.rfind("at:", 0) == 0) {
       const auto column = parseInt(key.substr(3));
       if (!column.has_value() || *column <= 0) {
@@ -146,7 +252,7 @@ std::string TemplateEngine::renderBar(const std::string& metric_key,
                                       std::size_t width,
                                       double max_value,
                                       const core::MetricMap& metrics) {
-  std::string bar(width, ' ');
+  std::string bar(width, core::kGlyphBarBase);
   const auto metric = metrics.find(metric_key);
   if (metric == metrics.end() || width == 0 || max_value <= 0.0) {
     return bar;
@@ -173,7 +279,8 @@ std::string TemplateEngine::renderBar(const std::string& metric_key,
 }
 
 std::string TemplateEngine::renderLine(const std::string& line,
-                                       const core::MetricMap& metrics) {
+                                       const core::MetricMap& metrics,
+                                       RenderContext& context) {
   std::string output;
   output.reserve(line.size());
 
@@ -213,6 +320,14 @@ std::string TemplateEngine::renderLine(const std::string& line,
       }
 
       output.append(replacement);
+      index = end;
+      continue;
+    } else if (key.rfind("glyph:", 0) == 0) {
+      if (const auto glyph = context.resolveGlyph(key.substr(6)); glyph.has_value()) {
+        output.push_back(*glyph);
+      } else {
+        output.push_back('?');
+      }
       index = end;
       continue;
     } else if (key.rfind("at:", 0) == 0) {

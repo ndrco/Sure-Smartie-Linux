@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "sure_smartie/core/ConfigValidator.hpp"
 #include "sure_smartie/core/Types.hpp"
 #include "sure_smartie/engine/ScreenManager.hpp"
 #include "sure_smartie/engine/TemplateEngine.hpp"
@@ -42,8 +43,10 @@ int main() {
       engine.render(bar_screen, metrics, {.cols = 20, .rows = 1});
   assert(bar_frame.size() == 1);
   assert(bar_frame[0].size() == 20);
-  assert(static_cast<unsigned char>(bar_frame[0][4]) == 5);
-  assert(static_cast<unsigned char>(bar_frame[0][5]) == 3);
+  assert(bar_frame[0][4] == sure_smartie::core::kGlyphBar5);
+  assert(bar_frame[0][5] == sure_smartie::core::kGlyphBar3);
+  assert(bar_frame[0][6] == sure_smartie::core::kGlyphBarBase);
+  assert(bar_frame[0][7] == sure_smartie::core::kGlyphBarBase);
 
   sure_smartie::core::ScreenDefinition aligned_screen{
       .name = "aligned",
@@ -54,6 +57,52 @@ int main() {
       engine.render(aligned_screen, metrics, {.cols = 20, .rows = 1});
   assert(aligned_frame.size() == 1);
   assert(aligned_frame[0] == "CPU 42%    73%      ");
+
+  const std::vector<sure_smartie::core::CustomGlyphDefinition> custom_glyphs{
+      sure_smartie::core::CustomGlyphDefinition{
+          .name = "heart",
+          .pattern = {0x00, 0x0A, 0x1F, 0x1F, 0x1F, 0x0E, 0x04, 0x00},
+      },
+  };
+  sure_smartie::core::ScreenDefinition custom_glyph_screen{
+      .name = "custom",
+      .interval = std::chrono::milliseconds{5},
+      .lines = {"{glyph:heart}{bar:cpu.load,2}"},
+  };
+  const auto custom_rendered =
+      engine.renderDetailed(custom_glyph_screen, metrics, {.cols = 8, .rows = 1}, custom_glyphs);
+  assert(custom_rendered.frame.size() == 1);
+  assert(static_cast<unsigned char>(custom_rendered.frame[0][0]) == 0);
+  assert(static_cast<unsigned char>(custom_rendered.frame[0][1]) == 4);
+  assert(static_cast<unsigned char>(custom_rendered.frame[0][2]) == 6);
+  assert(custom_rendered.glyphs[0].active);
+  assert(custom_rendered.glyphs[0].name == "heart");
+  assert(custom_rendered.glyphs[0].pattern[2] == 0x1F);
+
+  sure_smartie::core::AppConfig invalid_config;
+  invalid_config.custom_glyphs = {
+      sure_smartie::core::CustomGlyphDefinition{.name = "a"},
+      sure_smartie::core::CustomGlyphDefinition{.name = "b"},
+      sure_smartie::core::CustomGlyphDefinition{.name = "c"},
+  };
+  invalid_config.screens = {
+      sure_smartie::core::ScreenDefinition{
+          .name = "invalid",
+          .interval = std::chrono::milliseconds{5},
+          .lines = {"{bar:cpu.load,1}{glyph:a}{glyph:b}{glyph:c}"},
+      },
+  };
+  const auto invalid_diagnostics =
+      sure_smartie::core::ConfigValidator::validate(invalid_config);
+  bool found_slot_error = false;
+  for (const auto& diagnostic : invalid_diagnostics) {
+    if (diagnostic.field_path == "screens[0].lines" &&
+        diagnostic.severity == sure_smartie::core::DiagnosticSeverity::error) {
+      found_slot_error = true;
+      break;
+    }
+  }
+  assert(found_slot_error);
 
   sure_smartie::engine::ScreenManager manager({first, second});
   const auto start = std::chrono::steady_clock::now();

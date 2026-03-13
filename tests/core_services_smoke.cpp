@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <unistd.h>
 #include <vector>
@@ -53,6 +54,14 @@ int main() {
   config.display.backlight = false;
   config.display.contrast = 120;
   config.display.brightness = 180;
+  const auto fan_sample_path = std::filesystem::temp_directory_path() /
+                               ("sure-smartie-cpu-fan-" + std::to_string(::getpid()) + ".txt");
+  {
+    std::ofstream fan_sample(fan_sample_path);
+    fan_sample << "900\n";
+  }
+  config.cpu_fan.rpm_path = fan_sample_path.string();
+  config.cpu_fan.max_rpm = 1800;
   config.providers = {"cpu", "system"};
   config.plugin_paths = {"./build/sure_smartie_demo_plugin.so"};
   config.screens = {
@@ -84,6 +93,8 @@ int main() {
   assert(loaded.display.backlight == config.display.backlight);
   assert(loaded.display.contrast == config.display.contrast);
   assert(loaded.display.brightness == config.display.brightness);
+  assert(loaded.cpu_fan.rpm_path == config.cpu_fan.rpm_path);
+  assert(loaded.cpu_fan.max_rpm == config.cpu_fan.max_rpm);
   assert(loaded.providers == config.providers);
   assert(loaded.plugin_paths == config.plugin_paths);
   assert(loaded.screens.size() == config.screens.size());
@@ -95,6 +106,7 @@ int main() {
   invalid.display.type = "mystery";
   invalid.display.cols = 0;
   invalid.display.brightness = 999;
+  invalid.cpu_fan.max_rpm = -1;
   invalid.providers = {"missing-provider"};
   invalid.screens = {
       ScreenDefinition{
@@ -103,6 +115,7 @@ int main() {
           .lines = {
               "{bar:cpu.load,x}",
               "{at:0}",
+              "{glyph:unknown}",
               "{",
           },
       },
@@ -112,11 +125,13 @@ int main() {
   assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "display.type"));
   assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "display.cols"));
   assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "display.brightness"));
+  assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "cpu_fan.max_rpm"));
   assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "providers[0]"));
   assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "screens[0].interval_ms"));
   assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "screens[0].lines[0]"));
   assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "screens[0].lines[1]"));
   assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "screens[0].lines[2]"));
+  assert(containsDiagnostic(diagnostics, DiagnosticSeverity::error, "screens[0].lines[3]"));
 
   MetricMap metrics{
       {"cpu.load", "42"},
@@ -130,7 +145,7 @@ int main() {
   const auto actual = renderer.renderScreen(config, metrics, 0);
   assert(expected == actual);
 
-  sure_smartie::providers::CpuProvider cpu_provider;
+  sure_smartie::providers::CpuProvider cpu_provider(config.cpu_fan);
   sure_smartie::providers::GpuProvider gpu_provider;
   MetricMap collected_metrics;
   cpu_provider.collect(collected_metrics);
@@ -139,9 +154,36 @@ int main() {
   assert(collected_metrics.contains("cpu.power_w"));
   assert(collected_metrics.contains("cpu.fan_rpm"));
   assert(collected_metrics.contains("cpu.fan_percent"));
+  assert(collected_metrics["cpu.fan_rpm"] == "900");
+  assert(collected_metrics["cpu.fan_percent"] == "50");
   assert(collected_metrics.contains("gpu.power_w"));
+  assert(collected_metrics.contains("gpu.clock"));
   assert(collected_metrics.contains("gpu.fan_rpm"));
   assert(collected_metrics.contains("gpu.fan_percent"));
+
+  const auto hwmon_test_root =
+      std::filesystem::temp_directory_path() /
+      ("sure-smartie-hwmon-" + std::to_string(::getpid()));
+  const auto missing_hwmon_dir = hwmon_test_root / "hwmon" / "hwmon9";
+  const auto recovered_hwmon_dir = hwmon_test_root / "hwmon" / "hwmon2";
+  std::filesystem::create_directories(recovered_hwmon_dir);
+  {
+    std::ofstream recovered_fan(recovered_hwmon_dir / "fan3_input");
+    recovered_fan << "1200\n";
+  }
+
+  sure_smartie::providers::CpuProvider recovered_cpu_provider(
+      sure_smartie::core::CpuFanConfig{
+          .rpm_path = (missing_hwmon_dir / "fan3_input").string(),
+          .max_rpm = 2400,
+      });
+  MetricMap recovered_metrics;
+  recovered_cpu_provider.collect(recovered_metrics);
+  assert(recovered_metrics["cpu.fan_rpm"] == "1200");
+  assert(recovered_metrics["cpu.fan_percent"] == "50");
+
+  std::filesystem::remove(fan_sample_path);
+  std::filesystem::remove_all(hwmon_test_root);
 
   return 0;
 }

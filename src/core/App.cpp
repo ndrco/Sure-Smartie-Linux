@@ -1,5 +1,6 @@
 #include "sure_smartie/core/App.hpp"
 
+#include <algorithm>
 #include <csignal>
 #include <exception>
 #include <iostream>
@@ -40,7 +41,7 @@ std::vector<std::unique_ptr<providers::IProvider>> createProviders(
     }
 
     try {
-      providers.push_back(providers::createBuiltinProvider(provider_name));
+      providers.push_back(providers::createBuiltinProvider(provider_name, config));
     } catch (const std::exception& error) {
       logMessage(
           LogLevel::warn,
@@ -72,6 +73,18 @@ std::vector<std::unique_ptr<providers::IProvider>> createProviders(
   }
 
   return providers;
+}
+
+std::array<std::uint8_t, 8> toProtocolGlyphPattern(const GlyphPattern& pattern) {
+  std::array<std::uint8_t, 8> bytes{};
+  for (std::size_t row = 0; row < pattern.size(); ++row) {
+    bytes[row] = static_cast<std::uint8_t>(std::clamp(pattern[row], 0, 0x1F));
+  }
+  return bytes;
+}
+
+Frame blankFrameForGeometry(DisplayGeometry geometry) {
+  return Frame(geometry.rows, std::string(geometry.cols, ' '));
 }
 
 }  // namespace
@@ -109,15 +122,36 @@ void App::renderOnce() {
   const auto now = std::chrono::steady_clock::now();
   const auto metrics = collectMetrics();
   const auto& screen = screen_manager_.current(now);
-  const auto frame =
-      template_engine_.render(screen, metrics, display_->geometry());
+  const auto rendered =
+      template_engine_.renderDetailed(screen, metrics, display_->geometry(), config_.custom_glyphs);
 
   display_->initialize();
-  display_->render(frame);
+  for (std::size_t slot = 0; slot < rendered.glyphs.size(); ++slot) {
+    if (!rendered.glyphs[slot].active) {
+      continue;
+    }
+
+    display_->uploadCustomCharacter(static_cast<std::uint8_t>(slot),
+                                    toProtocolGlyphPattern(rendered.glyphs[slot].pattern));
+  }
+  display_->render(rendered.frame);
+}
+
+void App::shutdownDisplay() {
+  if (options_.force_stdout_display || config_.display.type == "stdout") {
+    display_->release();
+    return;
+  }
+
+  display_->initialize();
+  display_->render(blankFrameForGeometry(display_->geometry()));
+  display_->setBacklight(false);
+  display_->release();
 }
 
 int App::run() {
   const auto previous_handler = std::signal(SIGINT, onSignal);
+  const auto previous_term_handler = std::signal(SIGTERM, onSignal);
   g_stop_requested = &stop_requested_;
   const auto refresh_interval = normalizedRefreshInterval(config_.refresh_interval);
 
@@ -133,6 +167,7 @@ int App::run() {
       logMessage(LogLevel::info, "app", "single render completed");
       g_stop_requested = nullptr;
       std::signal(SIGINT, previous_handler);
+      std::signal(SIGTERM, previous_term_handler);
       return 0;
     }
 
@@ -171,12 +206,25 @@ int App::run() {
   } catch (...) {
     g_stop_requested = nullptr;
     std::signal(SIGINT, previous_handler);
+    std::signal(SIGTERM, previous_term_handler);
     throw;
+  }
+
+  try {
+    shutdownDisplay();
+  } catch (const std::exception& error) {
+    logMessage(
+        LogLevel::warn,
+        "display",
+        "display shutdown cleanup failed",
+        {{"error", error.what()}});
+    display_->release();
   }
 
   logMessage(LogLevel::info, "app", "stopping render loop");
   g_stop_requested = nullptr;
   std::signal(SIGINT, previous_handler);
+  std::signal(SIGTERM, previous_term_handler);
   return 0;
 }
 

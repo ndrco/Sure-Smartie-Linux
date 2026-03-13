@@ -19,7 +19,7 @@ MetricsSnapshotService::MetricsSnapshotService(const AppConfig& config) {
     }
 
     try {
-      providers_.push_back(providers::createBuiltinProvider(provider_name));
+      providers_.push_back(providers::createBuiltinProvider(provider_name, config));
     } catch (const std::exception& error) {
       base_diagnostics_.push_back(Diagnostic{
           .severity = DiagnosticSeverity::warning,

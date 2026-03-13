@@ -10,6 +10,10 @@
     "contrast": 128,
     "brightness": 192
   },
+  "cpu_fan": {
+    "rpm_path": "",
+    "max_rpm": 0
+  },
   "providers": [
     "cpu",
     "gpu",

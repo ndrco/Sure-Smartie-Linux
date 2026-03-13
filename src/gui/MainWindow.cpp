@@ -376,6 +376,30 @@ void MainWindow::buildUi() {
   display_layout->addRow("Brightness", brightness_spin_);
   editor_layout->addWidget(display_group);
 
+  auto* cpu_fan_group = new QGroupBox("CPU Fan Sensor", editor_root);
+  auto* cpu_fan_layout = new QFormLayout(cpu_fan_group);
+  cpu_fan_layout->setContentsMargins(16, 18, 16, 16);
+  cpu_fan_layout->setHorizontalSpacing(14);
+  cpu_fan_layout->setVerticalSpacing(10);
+  cpu_fan_layout->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+  cpu_fan_layout->setFormAlignment(Qt::AlignTop);
+  cpu_fan_rpm_path_edit_ = new QLineEdit(cpu_fan_group);
+  cpu_fan_rpm_path_edit_->setObjectName("cpuFanRpmPathEdit");
+  cpu_fan_rpm_path_edit_->setPlaceholderText("/sys/class/hwmon/hwmon9/fan3_input");
+  cpu_fan_max_rpm_spin_ = new QSpinBox(cpu_fan_group);
+  cpu_fan_max_rpm_spin_->setObjectName("cpuFanMaxRpmSpin");
+  cpu_fan_max_rpm_spin_->setRange(0, 50000);
+  cpu_fan_max_rpm_spin_->setSpecialValueText("not set");
+  auto* cpu_fan_hint = new QLabel(
+      "cpu.fan_rpm reads the exact sysfs file. cpu.fan_percent uses Max RPM when it is set.",
+      cpu_fan_group);
+  cpu_fan_hint->setObjectName("sectionHintLabel");
+  cpu_fan_hint->setWordWrap(true);
+  cpu_fan_layout->addRow("RPM path", cpu_fan_rpm_path_edit_);
+  cpu_fan_layout->addRow("Max RPM", cpu_fan_max_rpm_spin_);
+  cpu_fan_layout->addRow(QString(), cpu_fan_hint);
+  editor_layout->addWidget(cpu_fan_group);
+
   auto* providers_group = new QGroupBox("Providers & Plugins", editor_root);
   auto* providers_layout = new QVBoxLayout(providers_group);
   providers_layout->setContentsMargins(16, 18, 16, 16);
@@ -423,6 +447,75 @@ void MainWindow::buildUi() {
   plugin_buttons->addStretch(1);
   providers_layout->addLayout(plugin_buttons);
   editor_layout->addWidget(providers_group);
+
+  auto* glyphs_group = new QGroupBox("Custom Glyphs", editor_root);
+  auto* glyphs_layout = new QHBoxLayout(glyphs_group);
+  glyphs_layout->setContentsMargins(16, 18, 16, 16);
+  glyphs_layout->setSpacing(14);
+
+  auto* glyphs_list_column = new QVBoxLayout();
+  auto* glyphs_list_label = new QLabel("Available glyphs", glyphs_group);
+  glyphs_list_label->setObjectName("sectionCaptionLabel");
+  glyphs_list_column->addWidget(glyphs_list_label);
+  custom_glyphs_list_ = new QListWidget(glyphs_group);
+  custom_glyphs_list_->setObjectName("customGlyphList");
+  custom_glyphs_list_->setSelectionMode(QAbstractItemView::SingleSelection);
+  custom_glyphs_list_->setMinimumHeight(140);
+  custom_glyphs_list_->setAlternatingRowColors(true);
+  custom_glyphs_list_->setUniformItemSizes(true);
+  glyphs_list_column->addWidget(custom_glyphs_list_, 1);
+  auto* glyph_buttons = new QHBoxLayout();
+  glyph_buttons->setSpacing(8);
+  auto* add_glyph_button = new QPushButton("Add glyph", glyphs_group);
+  add_glyph_button->setObjectName("addCustomGlyphButton");
+  auto* remove_glyph_button = new QPushButton("Remove glyph", glyphs_group);
+  remove_glyph_button->setObjectName("removeCustomGlyphButton");
+  glyph_buttons->addWidget(add_glyph_button);
+  glyph_buttons->addWidget(remove_glyph_button);
+  glyph_buttons->addStretch(1);
+  glyphs_list_column->addLayout(glyph_buttons);
+  glyphs_layout->addLayout(glyphs_list_column, 1);
+
+  auto* glyph_editor_column = new QVBoxLayout();
+  auto* glyph_form = new QFormLayout();
+  glyph_form->setHorizontalSpacing(14);
+  glyph_form->setVerticalSpacing(10);
+  glyph_form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+  custom_glyph_name_edit_ = new QLineEdit(glyphs_group);
+  custom_glyph_name_edit_->setObjectName("customGlyphNameEdit");
+  custom_glyph_name_edit_->setPlaceholderText("heart");
+  glyph_form->addRow("Name", custom_glyph_name_edit_);
+  glyph_editor_column->addLayout(glyph_form);
+  custom_glyph_token_label_ = new QLabel(glyphs_group);
+  custom_glyph_token_label_->setObjectName("sectionHintLabel");
+  custom_glyph_token_label_->setWordWrap(true);
+  glyph_editor_column->addWidget(custom_glyph_token_label_);
+  auto* glyph_matrix = new QGridLayout();
+  glyph_matrix->setHorizontalSpacing(6);
+  glyph_matrix->setVerticalSpacing(6);
+  for (int row = 0; row < static_cast<int>(core::kGlyphHeight); ++row) {
+    auto* row_label = new QLabel(QString::number(row + 1), glyphs_group);
+    row_label->setObjectName("sectionHintLabel");
+    glyph_matrix->addWidget(row_label, row, 0, Qt::AlignCenter);
+    for (int column = 0; column < static_cast<int>(core::kGlyphWidth); ++column) {
+      auto* pixel_button = new QPushButton(glyphs_group);
+      pixel_button->setCheckable(true);
+      pixel_button->setProperty("glyphPixelButton", true);
+      pixel_button->setFixedSize(22, 22);
+      pixel_button->setFocusPolicy(Qt::StrongFocus);
+      custom_glyph_buttons_[static_cast<std::size_t>(row)]
+                           [static_cast<std::size_t>(column)] = pixel_button;
+      glyph_matrix->addWidget(pixel_button, row, column + 1);
+    }
+  }
+  glyph_editor_column->addLayout(glyph_matrix);
+  auto* glyph_hint = new QLabel("Rows are top-to-bottom. Columns are left-to-right.", glyphs_group);
+  glyph_hint->setObjectName("sectionHintLabel");
+  glyph_hint->setWordWrap(true);
+  glyph_editor_column->addWidget(glyph_hint);
+  glyph_editor_column->addStretch(1);
+  glyphs_layout->addLayout(glyph_editor_column, 1);
+  editor_layout->addWidget(glyphs_group);
 
   auto* screens_group = new QGroupBox("Screens Editor", editor_root);
   auto* screens_layout = new QHBoxLayout(screens_group);
@@ -639,6 +732,25 @@ void MainWindow::buildUi() {
             markConfigEdited(false, false, false);
           });
 
+  connect(cpu_fan_rpm_path_edit_, &QLineEdit::textChanged, this, [this](const QString& text) {
+    if (updating_ui_) {
+      return;
+    }
+    config_.cpu_fan.rpm_path = text.toStdString();
+    markConfigEdited(true, true, false);
+  });
+
+  connect(cpu_fan_max_rpm_spin_,
+          static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged),
+          this,
+          [this](int value) {
+            if (updating_ui_) {
+              return;
+            }
+            config_.cpu_fan.max_rpm = value;
+            markConfigEdited(true, true, false);
+          });
+
   for (const auto& [provider_name, check_box] : provider_checks_) {
     Q_UNUSED(provider_name);
     connect(check_box, &QCheckBox::toggled, this, [this](bool checked) {
@@ -663,6 +775,68 @@ void MainWindow::buildUi() {
   connect(add_plugin_button, &QPushButton::clicked, this, [this]() { addPluginPaths(); });
   connect(remove_plugin_button, &QPushButton::clicked, this, [this]() {
     removeSelectedPluginPath();
+  });
+
+  connect(custom_glyphs_list_,
+          &QListWidget::currentRowChanged,
+          this,
+          [this](int row) {
+            Q_UNUSED(row);
+            if (updating_ui_) {
+              return;
+            }
+            syncCustomGlyphEditorFromSelection();
+          });
+
+  connect(custom_glyph_name_edit_,
+          &QLineEdit::textChanged,
+          this,
+          [this](const QString& text) {
+            if (updating_ui_) {
+              return;
+            }
+            const int index = selectedCustomGlyphIndex();
+            if (index < 0 ||
+                static_cast<std::size_t>(index) >= config_.custom_glyphs.size()) {
+              return;
+            }
+            config_.custom_glyphs[static_cast<std::size_t>(index)].name = text.toStdString();
+            if (QListWidgetItem* item = custom_glyphs_list_->item(index)) {
+              item->setText(text.isEmpty() ? QString("glyph_%1").arg(index + 1) : text);
+            }
+            updateCustomGlyphTokenHint();
+            markConfigEdited(false, false, false);
+          });
+
+  for (int row = 0; row < static_cast<int>(core::kGlyphHeight); ++row) {
+    for (int column = 0; column < static_cast<int>(core::kGlyphWidth); ++column) {
+      auto* pixel_button =
+          custom_glyph_buttons_[static_cast<std::size_t>(row)][static_cast<std::size_t>(column)];
+      connect(pixel_button, &QPushButton::toggled, this, [this, row, column](bool checked) {
+        if (updating_ui_) {
+          return;
+        }
+        const int index = selectedCustomGlyphIndex();
+        if (index < 0 ||
+            static_cast<std::size_t>(index) >= config_.custom_glyphs.size()) {
+          return;
+        }
+
+        auto& glyph = config_.custom_glyphs[static_cast<std::size_t>(index)];
+        const int mask = 1 << (static_cast<int>(core::kGlyphWidth) - column - 1);
+        if (checked) {
+          glyph.pattern[static_cast<std::size_t>(row)] |= mask;
+        } else {
+          glyph.pattern[static_cast<std::size_t>(row)] &= ~mask;
+        }
+        markConfigEdited(false, false, false);
+      });
+    }
+  }
+
+  connect(add_glyph_button, &QPushButton::clicked, this, [this]() { addCustomGlyph(); });
+  connect(remove_glyph_button, &QPushButton::clicked, this, [this]() {
+    removeSelectedCustomGlyph();
   });
 
   connect(screens_list_,
@@ -856,6 +1030,23 @@ void MainWindow::applyStyle() {
       "  padding: 8px 12px;"
       "  font-weight: 600;"
       "}"
+      "QPushButton[glyphPixelButton=\"true\"] {"
+      "  background: #fffdf9;"
+      "  color: transparent;"
+      "  border: 1px solid #ccbfae;"
+      "  border-radius: 5px;"
+      "  padding: 0;"
+      "}"
+      "QPushButton[glyphPixelButton=\"true\"]:checked {"
+      "  background: #294734;"
+      "  border: 1px solid #21382b;"
+      "}"
+      "QPushButton[glyphPixelButton=\"true\"]:hover {"
+      "  background: #e7f0d2;"
+      "}"
+      "QPushButton[glyphPixelButton=\"true\"]:checked:hover {"
+      "  background: #315541;"
+      "}"
       "QPushButton:hover { background: #1f3d38; }"
       "QPushButton:pressed { background: #17302d; }"
       "QPushButton:disabled { background: #b5b0a6; color: #f0ece4; }"
@@ -1044,8 +1235,10 @@ void MainWindow::syncUiFromConfig() {
   updating_ui_ = true;
 
   syncDisplaySectionFromConfig();
+  syncCpuFanSectionFromConfig();
   syncProvidersSectionFromConfig();
   syncPluginSectionFromConfig();
+  syncCustomGlyphSectionFromConfig();
   syncScreensSectionFromConfig();
 
   updating_ui_ = previous_updating;
@@ -1062,6 +1255,11 @@ void MainWindow::syncDisplaySectionFromConfig() {
   backlight_check_->setChecked(config_.display.backlight);
   contrast_spin_->setValue(config_.display.contrast);
   brightness_spin_->setValue(config_.display.brightness);
+}
+
+void MainWindow::syncCpuFanSectionFromConfig() {
+  cpu_fan_rpm_path_edit_->setText(QString::fromStdString(config_.cpu_fan.rpm_path));
+  cpu_fan_max_rpm_spin_->setValue(config_.cpu_fan.max_rpm);
 }
 
 void MainWindow::syncProvidersSectionFromConfig() {
@@ -1096,6 +1294,31 @@ void MainWindow::syncPluginSectionFromConfig() {
   for (const auto& plugin_path : config_.plugin_paths) {
     plugin_paths_list_->addItem(QString::fromStdString(plugin_path));
   }
+}
+
+void MainWindow::syncCustomGlyphSectionFromConfig() {
+  int selected_index = selectedCustomGlyphIndex();
+  if (selected_index < 0 && !config_.custom_glyphs.empty()) {
+    selected_index = 0;
+  }
+  if (selected_index >= static_cast<int>(config_.custom_glyphs.size())) {
+    selected_index = static_cast<int>(config_.custom_glyphs.size()) - 1;
+  }
+
+  custom_glyphs_list_->clear();
+  for (std::size_t index = 0; index < config_.custom_glyphs.size(); ++index) {
+    const auto& glyph = config_.custom_glyphs[index];
+    const QString label =
+        glyph.name.empty() ? QString("glyph_%1").arg(index + 1)
+                           : QString::fromStdString(glyph.name);
+    custom_glyphs_list_->addItem(label);
+  }
+
+  if (!config_.custom_glyphs.empty() && selected_index >= 0) {
+    custom_glyphs_list_->setCurrentRow(selected_index);
+  }
+
+  syncCustomGlyphEditorFromSelection();
 }
 
 void MainWindow::syncScreensSectionFromConfig() {
@@ -1161,6 +1384,40 @@ void MainWindow::syncScreenEditorFromSelection() {
 
   updating_ui_ = previous_updating;
   updateLineLabels();
+}
+
+void MainWindow::syncCustomGlyphEditorFromSelection() {
+  const bool previous_updating = updating_ui_;
+  updating_ui_ = true;
+
+  const int index = selectedCustomGlyphIndex();
+  const bool has_selection =
+      index >= 0 && static_cast<std::size_t>(index) < config_.custom_glyphs.size();
+
+  custom_glyph_name_edit_->setEnabled(has_selection);
+  if (has_selection) {
+    const auto& glyph = config_.custom_glyphs[static_cast<std::size_t>(index)];
+    custom_glyph_name_edit_->setText(QString::fromStdString(glyph.name));
+    for (std::size_t row = 0; row < core::kGlyphHeight; ++row) {
+      const int row_bits = glyph.pattern[row];
+      for (std::size_t column = 0; column < core::kGlyphWidth; ++column) {
+        const int mask = 1 << static_cast<int>(core::kGlyphWidth - column - 1);
+        custom_glyph_buttons_[row][column]->setEnabled(true);
+        custom_glyph_buttons_[row][column]->setChecked((row_bits & mask) != 0);
+      }
+    }
+  } else {
+    custom_glyph_name_edit_->clear();
+    for (auto& row_buttons : custom_glyph_buttons_) {
+      for (auto* button : row_buttons) {
+        button->setEnabled(false);
+        button->setChecked(false);
+      }
+    }
+  }
+
+  updating_ui_ = previous_updating;
+  updateCustomGlyphTokenHint();
 }
 
 void MainWindow::rebuildLineEditors() {
@@ -1264,6 +1521,24 @@ void MainWindow::updatePreviewScreenChoices() {
   updating_ui_ = previous_updating;
 }
 
+void MainWindow::updateCustomGlyphTokenHint() {
+  if (custom_glyph_token_label_ == nullptr) {
+    return;
+  }
+
+  const int index = selectedCustomGlyphIndex();
+  if (index < 0 || static_cast<std::size_t>(index) >= config_.custom_glyphs.size()) {
+    custom_glyph_token_label_->setText("Select or create a glyph to use it as {glyph:name}.");
+    return;
+  }
+
+  const QString name = custom_glyph_name_edit_->text().trimmed();
+  custom_glyph_token_label_->setText(
+      name.isEmpty()
+          ? "Give the glyph a name to reference it from a template."
+          : QString("Use in templates: {glyph:%1}").arg(name));
+}
+
 void MainWindow::updateValidationList() {
   validation_list_->clear();
 
@@ -1326,7 +1601,8 @@ void MainWindow::refreshPreview(bool recollect_metrics) {
   }
 
   const auto geometry = core::normalizedGeometry(config_.display);
-  auto frame = blankFrame();
+  core::RenderedFrame rendered;
+  rendered.frame = blankFrame();
   QString status = "Preview ready";
 
   try {
@@ -1338,7 +1614,8 @@ void MainWindow::refreshPreview(bool recollect_metrics) {
       }
       if (rotation_manager_ != nullptr) {
         const auto& screen = rotation_manager_->current(std::chrono::steady_clock::now());
-        frame = preview_renderer_.render(screen, geometry, last_metrics_);
+        rendered =
+            preview_renderer_.renderDetailed(screen, geometry, last_metrics_, config_.custom_glyphs);
         status = QString("Rotation preview: %1").arg(QString::fromStdString(screen.name));
       }
     } else {
@@ -1348,7 +1625,7 @@ void MainWindow::refreshPreview(bool recollect_metrics) {
       }
       if (preview_index >= 0 &&
           static_cast<std::size_t>(preview_index) < config_.screens.size()) {
-        frame = preview_renderer_.renderScreen(config_, last_metrics_, preview_index);
+        rendered = preview_renderer_.renderScreenDetailed(config_, last_metrics_, preview_index);
         status = QString("Previewing: %1").arg(
             screenLabel(config_.screens[static_cast<std::size_t>(preview_index)],
                         preview_index));
@@ -1360,7 +1637,8 @@ void MainWindow::refreshPreview(bool recollect_metrics) {
         .field_path = "preview",
         .message = "preview render failed: " + std::string(error.what()),
     });
-    frame = blankFrame();
+    rendered.frame = blankFrame();
+    rendered.glyphs = {};
     status = "Preview unavailable";
   }
 
@@ -1372,7 +1650,7 @@ void MainWindow::refreshPreview(bool recollect_metrics) {
   }
 
   preview_status_label_->setText(status);
-  preview_widget_->setFrame(geometry, std::move(frame));
+  preview_widget_->setFrame(geometry, std::move(rendered.frame), std::move(rendered.glyphs));
   updateValidationList();
 }
 
@@ -1385,6 +1663,10 @@ int MainWindow::selectedScreenIndex() const {
   return screens_list_ != nullptr ? screens_list_->currentRow() : -1;
 }
 
+int MainWindow::selectedCustomGlyphIndex() const {
+  return custom_glyphs_list_ != nullptr ? custom_glyphs_list_->currentRow() : -1;
+}
+
 void MainWindow::setSelectedScreen(int index) {
   if (screens_list_ == nullptr) {
     return;
@@ -1395,6 +1677,18 @@ void MainWindow::setSelectedScreen(int index) {
   screens_list_->setCurrentRow(index);
   updating_ui_ = previous_updating;
   syncScreenEditorFromSelection();
+}
+
+void MainWindow::setSelectedCustomGlyph(int index) {
+  if (custom_glyphs_list_ == nullptr) {
+    return;
+  }
+
+  const bool previous_updating = updating_ui_;
+  updating_ui_ = true;
+  custom_glyphs_list_->setCurrentRow(index);
+  updating_ui_ = previous_updating;
+  syncCustomGlyphEditorFromSelection();
 }
 
 void MainWindow::addScreen() {
@@ -1451,6 +1745,29 @@ void MainWindow::moveSelectedScreen(int delta) {
   syncScreensSectionFromConfig();
   setSelectedScreen(target);
   markConfigEdited(false, false, true);
+}
+
+void MainWindow::addCustomGlyph() {
+  core::CustomGlyphDefinition glyph;
+  glyph.name = "glyph_" + std::to_string(config_.custom_glyphs.size() + 1);
+  config_.custom_glyphs.push_back(std::move(glyph));
+  syncCustomGlyphSectionFromConfig();
+  setSelectedCustomGlyph(static_cast<int>(config_.custom_glyphs.size() - 1));
+  markConfigEdited(false, false, false);
+}
+
+void MainWindow::removeSelectedCustomGlyph() {
+  const int index = selectedCustomGlyphIndex();
+  if (index < 0 || static_cast<std::size_t>(index) >= config_.custom_glyphs.size()) {
+    return;
+  }
+
+  config_.custom_glyphs.erase(config_.custom_glyphs.begin() + index);
+  syncCustomGlyphSectionFromConfig();
+  if (!config_.custom_glyphs.empty()) {
+    setSelectedCustomGlyph(std::min(index, static_cast<int>(config_.custom_glyphs.size() - 1)));
+  }
+  markConfigEdited(false, false, false);
 }
 
 void MainWindow::addPluginPaths() {
@@ -1515,6 +1832,14 @@ void MainWindow::focusFieldPath(const QString& field_path) {
     brightness_spin_->setFocus();
     return;
   }
+  if (field_path == "cpu_fan.rpm_path") {
+    cpu_fan_rpm_path_edit_->setFocus();
+    return;
+  }
+  if (field_path == "cpu_fan.max_rpm") {
+    cpu_fan_max_rpm_spin_->setFocus();
+    return;
+  }
 
   if (const auto provider_field = parseIndexedField(field_path, "providers");
       provider_field.has_value()) {
@@ -1533,6 +1858,25 @@ void MainWindow::focusFieldPath(const QString& field_path) {
 
   if (field_path.startsWith("plugin_paths[")) {
     plugin_paths_list_->setFocus();
+    return;
+  }
+
+  if (const auto glyph_field = parseIndexedField(field_path, "custom_glyphs");
+      glyph_field.has_value()) {
+    const int glyph_index = glyph_field->first;
+    const QString suffix = glyph_field->second;
+    if (glyph_index >= 0 &&
+        static_cast<std::size_t>(glyph_index) < config_.custom_glyphs.size()) {
+      setSelectedCustomGlyph(glyph_index);
+      if (suffix == ".name") {
+        custom_glyph_name_edit_->setFocus();
+        return;
+      }
+      if (suffix == ".rows" || suffix.startsWith(".rows[")) {
+        custom_glyph_buttons_.front().front()->setFocus();
+        return;
+      }
+    }
     return;
   }
 

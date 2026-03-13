@@ -20,6 +20,7 @@ struct GpuMetrics {
   std::string name{"--"};
   std::string vendor{"--"};
   std::string load{"--"};
+  std::string clock{"--"};
   std::string temp{"--"};
   std::string mem_used{"--"};
   std::string mem_total{"--"};
@@ -55,6 +56,14 @@ std::vector<std::string> splitCsvLine(const std::string& line) {
   return fields;
 }
 
+std::string toLower(std::string value) {
+  std::transform(value.begin(),
+                 value.end(),
+                 value.begin(),
+                 [](unsigned char symbol) { return static_cast<char>(std::tolower(symbol)); });
+  return value;
+}
+
 std::optional<double> parseNumber(const std::string& value) {
   const auto trimmed = trim(value);
   if (trimmed.empty() || trimmed == "[N/A]" || trimmed == "N/A" || trimmed == "--") {
@@ -70,7 +79,7 @@ std::optional<double> parseNumber(const std::string& value) {
 
 std::string formatWatts(double watts) {
   std::ostringstream output;
-  output << std::fixed << std::setprecision(1) << watts;
+  output << static_cast<int>(std::lround(watts));
   return output.str();
 }
 
@@ -126,6 +135,10 @@ std::optional<long long> readIntegerFile(const std::filesystem::path& path) {
   }
 }
 
+std::string formatMhz(long long mhz) {
+  return std::to_string(static_cast<int>(mhz)) + "M";
+}
+
 std::optional<double> readPwmPercent(const std::filesystem::path& hwmon_path, int index) {
   const auto pwm = readIntegerFile(hwmon_path / ("pwm" + std::to_string(index)));
   if (!pwm.has_value()) {
@@ -160,6 +173,47 @@ std::optional<double> readHwmonPowerWatts(const std::filesystem::path& device_pa
         return static_cast<double>(*raw_power) / 1000000.0;
       }
     }
+  }
+
+  return std::nullopt;
+}
+
+std::optional<std::string> readGpuClock(const std::filesystem::path& device_path) {
+  if (const auto intel_mhz = readIntegerFile(device_path / "gt_cur_freq_mhz");
+      intel_mhz.has_value() && *intel_mhz > 0) {
+    return formatMhz(*intel_mhz);
+  }
+  if (const auto intel_act_mhz = readIntegerFile(device_path / "gt_act_freq_mhz");
+      intel_act_mhz.has_value() && *intel_act_mhz > 0) {
+    return formatMhz(*intel_act_mhz);
+  }
+
+  if (const auto dpm = readFile(device_path / "pp_dpm_sclk"); dpm.has_value()) {
+    std::istringstream input(*dpm);
+    std::string line;
+    while (std::getline(input, line)) {
+      if (line.find('*') == std::string::npos) {
+        continue;
+      }
+
+      const auto colon = line.find(':');
+      const auto mhz = toLower(line).find("mhz");
+      if (colon == std::string::npos || mhz == std::string::npos || mhz <= colon) {
+        continue;
+      }
+
+      try {
+        return formatMhz(static_cast<long long>(
+            std::lround(std::stod(trim(line.substr(colon + 1, mhz - colon - 1))))));
+      } catch (...) {
+        continue;
+      }
+    }
+  }
+
+  if (const auto freq_khz = readIntegerFile(device_path / "pp_dpm_sclk_min");
+      freq_khz.has_value() && *freq_khz > 0) {
+    return formatMhz(static_cast<long long>(std::lround(*freq_khz / 1000.0)));
   }
 
   return std::nullopt;
@@ -223,7 +277,8 @@ std::optional<GpuMetrics> queryNvidiaSmi() {
 
   constexpr const char* kCommand =
       "nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,"
-      "memory.total,name,power.draw,fan.speed --format=csv,noheader,nounits 2>/dev/null";
+      "memory.total,name,power.draw,fan.speed,clocks.current.graphics "
+      "--format=csv,noheader,nounits 2>/dev/null";
   std::unique_ptr<FILE, PipeCloser> pipe(::popen(kCommand, "r"));
   if (!pipe) {
     return std::nullopt;
@@ -235,7 +290,7 @@ std::optional<GpuMetrics> queryNvidiaSmi() {
   }
 
   const auto fields = splitCsvLine(buffer);
-  if (fields.size() < 7) {
+  if (fields.size() < 8) {
     return std::nullopt;
   }
 
@@ -248,6 +303,9 @@ std::optional<GpuMetrics> queryNvidiaSmi() {
   }
   if (const auto temp = parseNumber(fields[1]); temp.has_value()) {
     metrics.temp = std::to_string(static_cast<int>(std::lround(*temp)));
+  }
+  if (const auto clock = parseNumber(fields[7]); clock.has_value()) {
+    metrics.clock = formatMhz(static_cast<long long>(std::lround(*clock)));
   }
 
   const auto mem_used = parseNumber(fields[2]);
@@ -322,6 +380,9 @@ void mergeGpuMetrics(GpuMetrics& base, const GpuMetrics& fallback) {
   if (base.load == "--") {
     base.load = fallback.load;
   }
+  if (base.clock == "--") {
+    base.clock = fallback.clock;
+  }
   if (base.temp == "--") {
     base.temp = fallback.temp;
   }
@@ -377,6 +438,9 @@ std::optional<GpuMetrics> queryDrmSysfs() {
     } else if (const auto load = readIntegerFile(device_path / "busy_percent");
                load.has_value()) {
       metrics.load = std::to_string(static_cast<int>(*load));
+    }
+    if (const auto clock = readGpuClock(device_path); clock.has_value()) {
+      metrics.clock = *clock;
     }
 
     if (const auto temp = readHwmonTemperature(device_path); temp.has_value()) {
@@ -438,6 +502,7 @@ void GpuProvider::collect(core::MetricMap& metrics) {
   metrics["gpu.name"] = gpu.name;
   metrics["gpu.vendor"] = gpu.vendor;
   metrics["gpu.load"] = gpu.load;
+  metrics["gpu.clock"] = gpu.clock;
   metrics["gpu.temp"] = gpu.temp;
   metrics["gpu.mem_used"] = gpu.mem_used;
   metrics["gpu.mem_total"] = gpu.mem_total;

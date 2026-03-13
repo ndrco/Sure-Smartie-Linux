@@ -15,20 +15,6 @@ std::uint8_t clampProtocolByte(int value) {
 
 }  // namespace
 
-void SureDisplayDriver::uploadBuiltInGlyphs() {
-  static constexpr std::array<std::array<std::uint8_t, 8>, 5> kBarGlyphs{{
-      {0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10},
-      {0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18},
-      {0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C, 0x1C},
-      {0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E, 0x1E},
-      {0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F},
-  }};
-
-  for (std::size_t index = 0; index < kBarGlyphs.size(); ++index) {
-    uploadCustomCharacter(static_cast<std::uint8_t>(index + 1), kBarGlyphs[index]);
-  }
-}
-
 SureDisplayDriver::SureDisplayDriver(std::string device,
                                      int baudrate,
                                      core::DisplayGeometry geometry,
@@ -60,7 +46,6 @@ void SureDisplayDriver::initialize() {
   if (backlight_) {
     setBrightness(brightness_);
   }
-  uploadBuiltInGlyphs();
 
   initialized_ = true;
 }
@@ -131,8 +116,7 @@ std::string SureDisplayDriver::sanitizeText(std::string text, std::size_t width)
 
   for (char& symbol : text) {
     const auto code = static_cast<unsigned char>(symbol);
-    if ((code < 0x20 && code != 0x01 && code != 0x02 && code != 0x03 &&
-         code != 0x04 && code != 0x05 && code != 0x06 && code != 0x07) ||
+    if ((code < 0x20 && code >= static_cast<unsigned char>(core::kGlyphSlotCount)) ||
         code > 0x7E) {
       symbol = '?';
     }
