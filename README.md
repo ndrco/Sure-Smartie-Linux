@@ -9,6 +9,10 @@ Linux-oriented C++20 utility for SURE Electronics 20x4 LCD Smartie Asset display
 
 Repository: <https://github.com/ndrco/Sure-Smartie-Linux>
 
+<p align="center">
+  <img src="assets/images/readme-gui-screenshot.svg" alt="Sure Smartie GUI screenshot" width="900">
+</p>
+
 ## Highlights
 
 - native serial driver for SURE LCD Smartie Asset displays
