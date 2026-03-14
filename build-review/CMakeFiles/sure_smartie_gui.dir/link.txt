@@ -1,2 +1,0 @@
-/usr/bin/ar qc libsure_smartie_gui.a CMakeFiles/sure_smartie_gui.dir/src/gui/LcdPreviewWidget.cpp.o CMakeFiles/sure_smartie_gui.dir/src/gui/MainWindow.cpp.o CMakeFiles/sure_smartie_gui.dir/sure_smartie_gui_autogen/MXUWEOXILK/qrc_resources.cpp.o
-/usr/bin/ranlib libsure_smartie_gui.a

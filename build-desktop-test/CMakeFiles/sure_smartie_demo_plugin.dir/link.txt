@@ -1,1 +1,0 @@
-/usr/bin/c++ -fPIC -shared  -o sure_smartie_demo_plugin.so CMakeFiles/sure_smartie_demo_plugin.dir/plugins/sure_smartie_demo_plugin.cpp.o 

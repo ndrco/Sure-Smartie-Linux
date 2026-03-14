@@ -345,16 +345,27 @@ install(
 )
 
 if(BUILD_TESTING AND SURE_SMARTIE_BUILD_TESTS)
+  function(sure_smartie_enable_test_assertions target_name)
+    if(MSVC)
+      target_compile_options(${target_name} PRIVATE /UNDEBUG)
+    else()
+      target_compile_options(${target_name} PRIVATE -UNDEBUG)
+    endif()
+  endfunction()
+
   add_executable(template_engine_smoke tests/template_engine_smoke.cpp)
   target_link_libraries(template_engine_smoke PRIVATE sure_smartie_core)
+  sure_smartie_enable_test_assertions(template_engine_smoke)
   add_test(NAME template_engine_smoke COMMAND template_engine_smoke)
 
   add_executable(core_services_smoke tests/core_services_smoke.cpp)
   target_link_libraries(core_services_smoke PRIVATE sure_smartie_core)
+  sure_smartie_enable_test_assertions(core_services_smoke)
   add_test(NAME core_services_smoke COMMAND core_services_smoke)
 
   add_executable(plugin_loader_smoke tests/plugin_loader_smoke.cpp)
   target_link_libraries(plugin_loader_smoke PRIVATE sure_smartie_core)
+  sure_smartie_enable_test_assertions(plugin_loader_smoke)
   add_test(
     NAME plugin_loader_smoke
     COMMAND plugin_loader_smoke $<TARGET_FILE:sure_smartie_demo_plugin>
@@ -384,6 +395,7 @@ if(BUILD_TESTING AND SURE_SMARTIE_BUILD_TESTS)
         Qt6::Gui
         Qt6::Widgets
     )
+    sure_smartie_enable_test_assertions(gui_smoke)
     add_test(NAME gui_smoke COMMAND gui_smoke)
     set_tests_properties(
       gui_smoke

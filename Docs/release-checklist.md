@@ -32,6 +32,9 @@ This produces:
 - `dist/Sure-Smartie-Linux-v0.1.0-linux-<arch>-install-rootfs.tar.gz`
 - `dist/Sure-Smartie-Linux-v0.1.0-SHA256SUMS.txt`
 
+The `portable` archive includes `install-release.sh` and `uninstall-release.sh`
+for installing the prebuilt runtime without a local source checkout.
+
 After pushing a `v*` tag, GitHub Actions also rebuilds these assets and uploads
 them to the matching GitHub Release automatically.
 

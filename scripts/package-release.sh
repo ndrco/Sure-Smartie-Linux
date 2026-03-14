@@ -40,66 +40,22 @@ cmake -S . -B "$build_dir" \
 cmake --build "$build_dir" -j"$(nproc)"
 
 rm -rf "$portable_root" "$stage_root"
-install -d \
-  "${portable_tree}/bin" \
-  "${portable_tree}/lib/sure-smartie-linux/plugins" \
-  "${portable_tree}/libexec/sure-smartie-linux" \
-  "${portable_tree}/examples" \
-  "${portable_tree}/docs"
+install -d "${portable_tree}"
 
-install -m 755 "${build_dir}/sure-smartie-linux" "${portable_tree}/bin/"
+env DESTDIR="$stage_root" cmake --install "$build_dir" --prefix /usr/local
 
-if [[ -f "${build_dir}/sure-smartie-gui" ]]; then
-  install -m 755 "${build_dir}/sure-smartie-gui" "${portable_tree}/bin/"
-fi
+cp -a "${stage_root}/usr" "${portable_tree}/usr"
+install -m 755 scripts/install-prebuilt-release.sh "${portable_tree}/install-release.sh"
+install -m 755 scripts/uninstall-system.sh "${portable_tree}/uninstall-release.sh"
 
-if [[ -f "${build_dir}/sure-smartie-privileged-save" ]]; then
-  install -m 755 "${build_dir}/sure-smartie-privileged-save" \
-    "${portable_tree}/libexec/sure-smartie-linux/"
-fi
-
-if [[ -f "${build_dir}/sure_smartie_demo_plugin.so" ]]; then
-  install -m 755 "${build_dir}/sure_smartie_demo_plugin.so" \
-    "${portable_tree}/lib/sure-smartie-linux/plugins/"
-fi
-
-for file in \
-  configs/stdout-example.json \
-  configs/plugin-example.json \
-  README.md \
-  LICENSE \
-  Docs/releases/"${version}".md
-do
+for file in README.md LICENSE Docs/releases/"${version}".md; do
   if [[ -f "$file" ]]; then
-    install -m 644 "$file" "${portable_tree}/docs/"
+    install -m 644 "$file" "${portable_tree}/"
   fi
 done
-
-if [[ -f configs/stdout-example.json ]]; then
-  install -m 644 configs/stdout-example.json "${portable_tree}/examples/"
-fi
-
-if [[ -f configs/plugin-example.json ]]; then
-  install -m 644 configs/plugin-example.json "${portable_tree}/examples/"
-fi
-
-for file in \
-  sure-smartie-gui.desktop \
-  sure-smartie-gui-save.policy \
-  sure-smartie-linux.service \
-  sure-smartie-linux-root.service \
-  sure-smartie-linux.env \
-  sure-smartie-linux-sleep.sh
-do
-  if [[ -f "${build_dir}/${file}" ]]; then
-    install -m 644 "${build_dir}/${file}" "${portable_tree}/docs/"
-  fi
-done
-
-env DESTDIR="$stage_root" cmake --install "$build_dir" --prefix /usr
 
 if command -v strip >/dev/null 2>&1; then
-  find "${portable_tree}" "$stage_root" -type f \( -perm -111 -o -name "*.so" \) \
+  find "${portable_tree}/usr" "$stage_root" -type f \( -perm -111 -o -name "*.so" \) \
     -exec strip --strip-unneeded {} + 2>/dev/null || true
 fi
 

@@ -121,6 +121,44 @@ If you prefer the non-root service variant:
 ./scripts/install-system.sh --user-service
 ```
 
+## Install From GitHub Release
+
+The GitHub Release publishes two prebuilt archives:
+
+- `Sure-Smartie-Linux-vX.Y.Z-linux-x86_64-portable.tar.gz`
+- `Sure-Smartie-Linux-vX.Y.Z-linux-x86_64-install-rootfs.tar.gz`
+
+The simplest option is the `portable` archive. It contains a ready-to-install
+runtime tree plus helper scripts:
+
+```bash
+tar -xzf Sure-Smartie-Linux-v0.1.0-linux-x86_64-portable.tar.gz
+cd portable
+sudo ./install-release.sh --root-service
+```
+
+To install the non-root service variant instead:
+
+```bash
+sudo ./install-release.sh --user-service
+```
+
+The bundled uninstall command is:
+
+```bash
+sudo sure-smartie-uninstall
+```
+
+The `install-rootfs` archive is useful for packaging or manual staging. It
+contains the installed `usr/...` tree exactly as produced by CMake:
+
+```bash
+tar -tzf Sure-Smartie-Linux-v0.1.0-linux-x86_64-install-rootfs.tar.gz | head
+sudo tar -C / -xzf Sure-Smartie-Linux-v0.1.0-linux-x86_64-install-rootfs.tar.gz
+sudo systemctl daemon-reload
+sudo systemctl enable --now sure-smartie-linux-root.service
+```
+
 Staging install:
 
 ```bash
@@ -166,10 +204,24 @@ Dry-run on stdout:
 ./build/sure-smartie-linux --config configs/stdout-example.json --once
 ```
 
+Run directly from an extracted prebuilt release without installing system-wide:
+
+```bash
+./portable/usr/local/bin/sure-smartie-linux \
+  --config ./portable/usr/local/share/sure-smartie-linux/examples/stdout-example.json \
+  --once
+```
+
 Run the GUI editor:
 
 ```bash
 ./build/sure-smartie-gui
+```
+
+Run the GUI directly from an extracted prebuilt release:
+
+```bash
+./portable/usr/local/bin/sure-smartie-gui
 ```
 
 By default the GUI first tries the same installed config path used by the
