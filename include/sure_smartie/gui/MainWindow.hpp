@@ -1,9 +1,12 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
+#include <future>
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include <QMainWindow>
@@ -63,7 +66,9 @@ class MainWindow : public QMainWindow {
   void updateFooterActions();
   void setDirty(bool dirty);
   bool maybeDiscardChanges();
-  bool saveCurrentConfig(bool force_prompt, QString* error_message = nullptr);
+  bool saveCurrentConfig(bool force_prompt,
+                         QString* error_message = nullptr,
+                         bool restart_service = false);
   bool applyCurrentConfig(QString* error_message = nullptr);
   void revertCurrentConfig();
 
@@ -81,8 +86,15 @@ class MainWindow : public QMainWindow {
   void updatePreviewScreenChoices();
   void updateCustomGlyphTokenHint();
   void updateValidationList();
+  bool saveConfigFilePrivileged(const QString& path,
+                               bool restart_service,
+                               QString* error_message = nullptr);
 
   void rebuildMetricsService();
+  void startAsyncMetricsCollection();
+  bool applyPendingMetricsCollectionIfReady(bool block);
+  void discardPendingMetricsCollection();
+  void requestAsyncPreviewRefresh();
   void resetRotationPreview();
   void refreshPreview(bool recollect_metrics);
   core::Frame blankFrame() const;
@@ -110,12 +122,16 @@ class MainWindow : public QMainWindow {
   bool dirty_{false};
   bool updating_ui_{false};
   bool metrics_service_dirty_{true};
+  bool metrics_collection_in_flight_{false};
+  std::uint64_t metrics_epoch_{0};
   core::MetricMap last_metrics_;
   std::vector<core::Diagnostic> preview_diagnostics_;
   std::vector<std::string> extra_provider_names_;
   std::unique_ptr<core::MetricsSnapshotService> metrics_service_;
   std::unique_ptr<engine::ScreenManager> rotation_manager_;
   core::PreviewFrameRenderer preview_renderer_;
+  std::future<std::tuple<std::uint64_t, core::MetricMap, std::vector<core::Diagnostic>>>
+      pending_metrics_future_;
 
   QLabel* project_path_label_{nullptr};
   QLabel* dirty_state_label_{nullptr};

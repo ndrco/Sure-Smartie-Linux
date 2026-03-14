@@ -150,6 +150,11 @@ if(SURE_SMARTIE_BUILD_GUI)
       ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-gui.desktop
       @ONLY
     )
+    configure_file(
+      packaging/polkit/sure-smartie-gui-save.policy.in
+      ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-gui-save.policy
+      @ONLY
+    )
 
     add_library(
       sure_smartie_gui
@@ -180,6 +185,30 @@ if(SURE_SMARTIE_BUILD_GUI)
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/third_party
     )
+    target_compile_definitions(
+      sure_smartie_gui
+      PRIVATE
+        SURE_SMARTIE_DEFAULT_CONFIG_PATH="${CMAKE_INSTALL_FULL_SYSCONFDIR}/sure-smartie-linux/config.json"
+        SURE_SMARTIE_PRIVILEGED_SAVE_HELPER_PATH="${CMAKE_INSTALL_FULL_LIBEXECDIR}/sure-smartie-linux/sure-smartie-privileged-save"
+    )
+
+    add_executable(
+      sure-smartie-privileged-save
+      src/gui/PrivilegedSaveHelper.cpp
+    )
+    target_compile_definitions(
+      sure-smartie-privileged-save
+      PRIVATE
+        SURE_SMARTIE_DEFAULT_CONFIG_PATH="${CMAKE_INSTALL_FULL_SYSCONFDIR}/sure-smartie-linux/config.json"
+        SURE_SMARTIE_ENV_FILE_PATH="${SURE_SMARTIE_ENV_FILE}"
+    )
+    target_compile_options(
+      sure-smartie-privileged-save
+      PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+    )
 
     add_executable(
       sure-smartie-gui
@@ -199,6 +228,10 @@ if(SURE_SMARTIE_BUILD_GUI)
         Qt6::Widgets
     )
     install(TARGETS sure-smartie-gui RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(
+      TARGETS sure-smartie-privileged-save
+      RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/sure-smartie-linux
+    )
   else()
     message(STATUS "Qt6 Widgets not found; sure-smartie-gui target is disabled")
   endif()
@@ -265,6 +298,10 @@ if(TARGET sure-smartie-gui)
   install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-gui.desktop
     DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+  )
+  install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/sure-smartie-gui-save.policy
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/polkit-1/actions
   )
 endif()
 install(

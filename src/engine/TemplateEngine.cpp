@@ -5,6 +5,8 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
@@ -60,34 +62,171 @@ std::optional<int> parseInt(const std::string& value) {
   return parsed;
 }
 
-struct ScreenBuiltInUsage {
-  bool uses_bar{false};
+enum class TokenKind {
+  literal,
+  metric,
+  bar,
+  glyph,
+  column,
 };
 
-ScreenBuiltInUsage scanBuiltInUsage(const core::ScreenDefinition& screen) {
-  ScreenBuiltInUsage usage;
+struct CompiledToken {
+  TokenKind kind{TokenKind::literal};
+  std::string text;
+  std::size_t width{0};
+  double max_value{100.0};
+  std::size_t column{0};
+};
 
+struct CompiledLine {
+  std::vector<CompiledToken> tokens;
+  bool uses_bar{false};
+  std::optional<std::size_t> estimated_width;
+};
+
+std::mutex g_compiled_line_cache_mutex;
+std::unordered_map<std::string, std::shared_ptr<const CompiledLine>> g_compiled_line_cache;
+
+void pushLiteral(CompiledLine& compiled, std::string text) {
+  if (text.empty()) {
+    return;
+  }
+
+  if (!compiled.tokens.empty() &&
+      compiled.tokens.back().kind == TokenKind::literal) {
+    compiled.tokens.back().text += std::move(text);
+    return;
+  }
+
+  compiled.tokens.push_back(CompiledToken{
+      .kind = TokenKind::literal,
+      .text = std::move(text),
+  });
+}
+
+CompiledLine compileLine(const std::string& line) {
+  CompiledLine compiled;
+  std::size_t estimated_width = 0;
+  bool width_known = true;
+  std::size_t cursor = 0;
+
+  while (cursor < line.size()) {
+    const auto open = line.find('{', cursor);
+    if (open == std::string::npos) {
+      const auto literal = line.substr(cursor);
+      pushLiteral(compiled, literal);
+      estimated_width += literal.size();
+      break;
+    }
+
+    if (open > cursor) {
+      const auto literal = line.substr(cursor, open - cursor);
+      pushLiteral(compiled, literal);
+      estimated_width += literal.size();
+    }
+
+    const auto end = line.find('}', open + 1);
+    if (end == std::string::npos) {
+      const auto literal = line.substr(open);
+      pushLiteral(compiled, literal);
+      estimated_width += literal.size();
+      break;
+    }
+
+    const auto key = line.substr(open + 1, end - open - 1);
+    if (key.rfind("bar:", 0) == 0) {
+      compiled.uses_bar = true;
+      const auto arguments = split(key.substr(4), ',');
+      if (arguments.size() >= 2 && arguments.size() <= 3) {
+        const auto metric_key = trim(arguments[0]);
+        const auto bar_width = parseInt(arguments[1]);
+        const auto max_value = arguments.size() > 2
+                                   ? parseNumber(trim(arguments[2]))
+                                   : std::optional<double>{100.0};
+
+        if (!metric_key.empty() && bar_width.has_value() && *bar_width > 0 &&
+            max_value.has_value() && *max_value > 0.0) {
+          compiled.tokens.push_back(CompiledToken{
+              .kind = TokenKind::bar,
+              .text = std::move(metric_key),
+              .width = static_cast<std::size_t>(*bar_width),
+              .max_value = *max_value,
+          });
+          estimated_width += static_cast<std::size_t>(*bar_width);
+        } else {
+          pushLiteral(compiled, "-");
+          width_known = false;
+        }
+      } else {
+        pushLiteral(compiled, "-");
+        width_known = false;
+      }
+    } else if (key.rfind("glyph:", 0) == 0) {
+      const auto glyph_name = trim(key.substr(6));
+      compiled.tokens.push_back(CompiledToken{
+          .kind = TokenKind::glyph,
+          .text = glyph_name,
+      });
+      if (glyph_name.empty()) {
+        width_known = false;
+      } else {
+        ++estimated_width;
+      }
+    } else if (key.rfind("at:", 0) == 0) {
+      const auto column = parseInt(key.substr(3));
+      compiled.tokens.push_back(CompiledToken{
+          .kind = TokenKind::column,
+          .text = {},
+          .column = column.has_value() && *column > 0
+                        ? static_cast<std::size_t>(*column)
+                        : 0,
+      });
+      if (column.has_value() && *column > 0) {
+        estimated_width = std::max(estimated_width, static_cast<std::size_t>(*column - 1));
+      } else {
+        width_known = false;
+      }
+    } else {
+      const auto metric_key = trim(key);
+      compiled.tokens.push_back(CompiledToken{
+          .kind = TokenKind::metric,
+          .text = metric_key,
+      });
+      if (metric_key.empty()) {
+        width_known = false;
+      } else {
+        ++estimated_width;
+      }
+    }
+
+    cursor = end + 1;
+  }
+
+  compiled.estimated_width =
+      width_known ? std::optional<std::size_t>{estimated_width} : std::nullopt;
+  return compiled;
+}
+
+std::shared_ptr<const CompiledLine> compiledLineFor(const std::string& line) {
+  std::lock_guard<std::mutex> lock(g_compiled_line_cache_mutex);
+  if (const auto it = g_compiled_line_cache.find(line);
+      it != g_compiled_line_cache.end()) {
+    return it->second;
+  }
+
+  auto compiled = std::make_shared<CompiledLine>(compileLine(line));
+  g_compiled_line_cache.emplace(line, compiled);
+  return compiled;
+}
+
+bool screenUsesBarGlyphs(const core::ScreenDefinition& screen) {
   for (const auto& line : screen.lines) {
-    for (std::size_t index = 0; index < line.size(); ++index) {
-      if (line[index] != '{') {
-        continue;
-      }
-
-      const auto end = line.find('}', index + 1);
-      if (end == std::string::npos) {
-        return usage;
-      }
-
-      const auto token = line.substr(index + 1, end - index - 1);
-      if (token.rfind("bar:", 0) == 0) {
-        usage.uses_bar = true;
-      }
-
-      index = end;
+    if (compiledLineFor(line)->uses_bar) {
+      return true;
     }
   }
 
-  return usage;
+  return false;
 }
 
 }  // namespace
@@ -96,8 +235,7 @@ struct TemplateEngine::RenderContext {
   explicit RenderContext(const core::ScreenDefinition& screen,
                          const std::vector<core::CustomGlyphDefinition>& glyph_list)
       : custom_glyphs(glyph_list) {
-    const auto builtins = scanBuiltInUsage(screen);
-    if (builtins.uses_bar) {
+    if (screenUsesBarGlyphs(screen)) {
       glyphs[1] = {.active = true, .name = "bar1", .pattern = core::barGlyphPattern(1)};
       glyphs[2] = {.active = true, .name = "bar2", .pattern = core::barGlyphPattern(2)};
       glyphs[3] = {.active = true, .name = "bar3", .pattern = core::barGlyphPattern(3)};
@@ -192,60 +330,7 @@ std::string TemplateEngine::fitToWidth(std::string text, std::size_t width) {
 
 std::optional<std::size_t> TemplateEngine::estimateRenderedWidth(
     const std::string& line) {
-  std::size_t width = 0;
-
-  for (std::size_t index = 0; index < line.size(); ++index) {
-    if (line[index] != '{') {
-      ++width;
-      continue;
-    }
-
-    const auto end = line.find('}', index + 1);
-    if (end == std::string::npos) {
-      return std::nullopt;
-    }
-
-    const auto key = line.substr(index + 1, end - index - 1);
-    if (key.rfind("bar:", 0) == 0) {
-      const auto arguments = split(key.substr(4), ',');
-      if (arguments.size() < 2 || arguments.size() > 3) {
-        return std::nullopt;
-      }
-
-      const auto metric_key = trim(arguments[0]);
-      const auto bar_width = parseInt(arguments[1]);
-      const auto max_value = arguments.size() > 2
-                                 ? parseNumber(trim(arguments[2]))
-                                 : std::optional<double>{100.0};
-
-      if (metric_key.empty() || !bar_width.has_value() || *bar_width <= 0 ||
-          !max_value.has_value() || *max_value <= 0.0) {
-        return std::nullopt;
-      }
-
-      width += static_cast<std::size_t>(*bar_width);
-    } else if (key.rfind("glyph:", 0) == 0) {
-      if (trim(key.substr(6)).empty()) {
-        return std::nullopt;
-      }
-      width += 1;
-    } else if (key.rfind("at:", 0) == 0) {
-      const auto column = parseInt(key.substr(3));
-      if (!column.has_value() || *column <= 0) {
-        return std::nullopt;
-      }
-
-      width = std::max(width, static_cast<std::size_t>(*column - 1));
-    } else if (key.empty()) {
-      return std::nullopt;
-    } else {
-      width += 1;
-    }
-
-    index = end;
-  }
-
-  return width;
+  return compiledLineFor(line)->estimated_width;
 }
 
 std::string TemplateEngine::renderBar(const std::string& metric_key,
@@ -281,70 +366,39 @@ std::string TemplateEngine::renderBar(const std::string& metric_key,
 std::string TemplateEngine::renderLine(const std::string& line,
                                        const core::MetricMap& metrics,
                                        RenderContext& context) {
+  const auto compiled = compiledLineFor(line);
   std::string output;
   output.reserve(line.size());
 
-  for (std::size_t index = 0; index < line.size(); ++index) {
-    if (line[index] != '{') {
-      output.push_back(line[index]);
-      continue;
-    }
-
-    const auto end = line.find('}', index + 1);
-    if (end == std::string::npos) {
-      output.push_back(line[index]);
-      continue;
-    }
-
-    const auto key = line.substr(index + 1, end - index - 1);
-    if (key.rfind("bar:", 0) == 0) {
-      const auto arguments = split(key.substr(4), ',');
-      std::string replacement = "-";
-
-      if (arguments.size() >= 2 && arguments.size() <= 3) {
-        const auto metric_key =
-            arguments.empty() ? std::string{} : trim(arguments[0]);
-        const auto width = parseInt(arguments[1]);
-        const auto max_value = arguments.size() > 2
-                                   ? parseNumber(trim(arguments[2]))
-                                   : std::optional<double>{100.0};
-
-        if (!metric_key.empty() && width.has_value() && *width > 0 &&
-            max_value.has_value() && *max_value > 0.0) {
-          replacement = renderBar(
-              metric_key,
-              static_cast<std::size_t>(*width),
-              *max_value,
-              metrics);
+  for (const auto& token : compiled->tokens) {
+    switch (token.kind) {
+      case TokenKind::literal:
+        output.append(token.text);
+        break;
+      case TokenKind::metric: {
+        const auto metric = metrics.find(token.text);
+        output.append(metric != metrics.end() ? metric->second : "-");
+        break;
+      }
+      case TokenKind::bar:
+        output.append(renderBar(token.text, token.width, token.max_value, metrics));
+        break;
+      case TokenKind::glyph:
+        if (const auto glyph = context.resolveGlyph(token.text); glyph.has_value()) {
+          output.push_back(*glyph);
+        } else {
+          output.push_back('?');
         }
-      }
-
-      output.append(replacement);
-      index = end;
-      continue;
-    } else if (key.rfind("glyph:", 0) == 0) {
-      if (const auto glyph = context.resolveGlyph(key.substr(6)); glyph.has_value()) {
-        output.push_back(*glyph);
-      } else {
-        output.push_back('?');
-      }
-      index = end;
-      continue;
-    } else if (key.rfind("at:", 0) == 0) {
-      const auto column = parseInt(key.substr(3));
-      if (column.has_value() && *column > 0) {
-        const auto target = static_cast<std::size_t>(*column - 1);
-        if (output.size() < target) {
-          output.resize(target, ' ');
+        break;
+      case TokenKind::column:
+        if (token.column > 0) {
+          const auto target = token.column - 1;
+          if (output.size() < target) {
+            output.resize(target, ' ');
+          }
         }
-      }
-      index = end;
-      continue;
+        break;
     }
-
-    const auto metric = metrics.find(trim(key));
-    output.append(metric != metrics.end() ? metric->second : "-");
-    index = end;
   }
 
   return output;

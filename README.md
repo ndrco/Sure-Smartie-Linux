@@ -134,6 +134,16 @@ If that file is missing, it falls back to
 `/usr/local/etc/sure-smartie-linux/config.json.example`, and only then to
 repo-local example configs for developer runs.
 
+When the GUI is saving back into `/usr/local/etc/sure-smartie-linux/config.json`,
+it first tries a normal user write and then falls back to a Polkit `pkexec`
+prompt so you can authenticate from the desktop session without running the
+whole GUI as root.
+
+In that same system-config mode, `Apply` saves the config and restarts the
+configured service, equivalent to `sudo systemctl restart sure-smartie-linux-root.service`
+unless `/usr/local/etc/default/sure-smartie-linux` overrides the unit name via
+`SURE_SMARTIE_SERVICE_NAME=...`.
+
 Open a specific config in the GUI:
 
 ```bash

@@ -16,6 +16,8 @@
 namespace sure_smartie::providers {
 namespace {
 
+constexpr auto kGpuMinimumPollInterval = std::chrono::milliseconds{750};
+
 struct GpuMetrics {
   std::string name{"--"};
   std::string vendor{"--"};
@@ -492,13 +494,7 @@ GpuMetrics readGpuMetrics() {
   return {};
 }
 
-}  // namespace
-
-std::string GpuProvider::name() const { return "gpu"; }
-
-void GpuProvider::collect(core::MetricMap& metrics) {
-  const auto gpu = readGpuMetrics();
-
+void applyGpuMetrics(core::MetricMap& metrics, const GpuMetrics& gpu) {
   metrics["gpu.name"] = gpu.name;
   metrics["gpu.vendor"] = gpu.vendor;
   metrics["gpu.load"] = gpu.load;
@@ -510,6 +506,35 @@ void GpuProvider::collect(core::MetricMap& metrics) {
   metrics["gpu.power_w"] = gpu.power_w;
   metrics["gpu.fan_rpm"] = gpu.fan_rpm;
   metrics["gpu.fan_percent"] = gpu.fan_percent;
+}
+
+void applyCachedGpuMetrics(core::MetricMap& metrics,
+                           const core::MetricMap& cached_metrics) {
+  for (const auto& [key, value] : cached_metrics) {
+    if (key.rfind("gpu.", 0) == 0) {
+      metrics[key] = value;
+    }
+  }
+}
+
+}  // namespace
+
+std::string GpuProvider::name() const { return "gpu"; }
+
+void GpuProvider::collect(core::MetricMap& metrics) {
+  const auto now = std::chrono::steady_clock::now();
+  if (has_cached_sample_ && now - last_sample_time_ < kGpuMinimumPollInterval) {
+    applyCachedGpuMetrics(metrics, cached_metrics_);
+    return;
+  }
+
+  const auto gpu = readGpuMetrics();
+  applyGpuMetrics(metrics, gpu);
+
+  cached_metrics_.clear();
+  applyGpuMetrics(cached_metrics_, gpu);
+  last_sample_time_ = now;
+  has_cached_sample_ = true;
 }
 
 }  // namespace sure_smartie::providers

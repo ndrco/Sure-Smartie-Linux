@@ -25,7 +25,9 @@ SureDisplayDriver::SureDisplayDriver(std::string device,
       geometry_(geometry),
       backlight_(backlight),
       contrast_(clampProtocolByte(contrast)),
-      brightness_(clampProtocolByte(brightness)) {}
+      brightness_(clampProtocolByte(brightness)) {
+  resetRenderCache();
+}
 
 core::DisplayGeometry SureDisplayDriver::geometry() const { return geometry_; }
 
@@ -53,12 +55,26 @@ void SureDisplayDriver::initialize() {
 void SureDisplayDriver::render(const core::Frame& frame) {
   initialize();
 
+  if (last_frame_.size() != geometry_.rows) {
+    resetRenderCache();
+  }
+
   for (std::size_t row = 0; row < geometry_.rows; ++row) {
-    writeLine(row + 1, row < frame.size() ? frame[row] : "");
+    const auto payload = sanitizeText(row < frame.size() ? frame[row] : "", geometry_.cols);
+    if (last_frame_[row] == payload) {
+      continue;
+    }
+
+    writeLine(row + 1, payload);
+    last_frame_[row] = std::move(payload);
   }
 }
 
-void SureDisplayDriver::release() { serial_.close(); }
+void SureDisplayDriver::release() {
+  serial_.close();
+  initialized_ = false;
+  resetRenderCache();
+}
 
 void SureDisplayDriver::setBacklight(bool on) {
   if (!serial_.isOpen()) {
@@ -103,10 +119,15 @@ void SureDisplayDriver::uploadCustomCharacter(
   if (index > 7) {
     throw std::invalid_argument("Custom character index must be in range 0..7");
   }
+  if (uploaded_glyphs_[index] && glyph_patterns_[index] == pattern) {
+    return;
+  }
 
   std::vector<std::uint8_t> bytes{0xFE, 0x4E, index};
   bytes.insert(bytes.end(), pattern.begin(), pattern.end());
   serial_.write(bytes);
+  uploaded_glyphs_[index] = true;
+  glyph_patterns_[index] = pattern;
 }
 
 std::string SureDisplayDriver::sanitizeText(std::string text, std::size_t width) {
@@ -131,14 +152,21 @@ void SureDisplayDriver::writeLine(std::size_t row, const std::string& text) {
     throw std::out_of_range("Display row is out of range");
   }
 
-  const auto payload = sanitizeText(text, geometry_.cols);
   std::vector<std::uint8_t> bytes{0xFE, 0x47, 0x01, static_cast<std::uint8_t>(row)};
-  bytes.insert(bytes.end(), payload.begin(), payload.end());
+  bytes.insert(bytes.end(), text.begin(), text.end());
   serial_.write(bytes);
 }
 
 void SureDisplayDriver::writeBytes(std::initializer_list<std::uint8_t> bytes) {
   serial_.write(bytes);
+}
+
+void SureDisplayDriver::resetRenderCache() {
+  last_frame_.assign(geometry_.rows, std::string(geometry_.cols, '\0'));
+  uploaded_glyphs_.fill(false);
+  for (auto& pattern : glyph_patterns_) {
+    pattern.fill(0);
+  }
 }
 
 }  // namespace sure_smartie::display

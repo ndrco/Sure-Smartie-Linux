@@ -223,15 +223,33 @@ std::optional<CpuProvider::CpuTimes> CpuProvider::readCpuTimes() {
   return times;
 }
 
-std::string CpuProvider::readCpuTemperature() {
+std::optional<std::filesystem::path> CpuProvider::resolvedFanPath() {
+  std::error_code error;
+  if (fan_path_.has_value() && std::filesystem::exists(*fan_path_, error)) {
+    return fan_path_;
+  }
+
+  fan_path_ = resolveFanPath(fan_config_.rpm_path);
+  return fan_path_;
+}
+
+std::optional<std::filesystem::path> CpuProvider::resolvedCpuTemperaturePath() {
+  if (cpu_temperature_path_.has_value()) {
+    if (const auto temp = readIntegerFile(*cpu_temperature_path_);
+        temp.has_value() && *temp > 0 && *temp <= 150000) {
+      return cpu_temperature_path_;
+    }
+    cpu_temperature_path_.reset();
+  }
+
   const std::filesystem::path thermal_root{"/sys/class/thermal"};
   std::error_code error;
   if (!std::filesystem::exists(thermal_root, error)) {
-    return "--";
+    return std::nullopt;
   }
 
   int best_score = -1;
-  long best_temp = -1;
+  std::optional<std::filesystem::path> best_path;
 
   for (const auto& entry : std::filesystem::directory_iterator(thermal_root, error)) {
     if (error) {
@@ -272,18 +290,46 @@ std::string CpuProvider::readCpuTemperature() {
 
     if (score > best_score) {
       best_score = score;
-      best_temp = temp_milli_c;
+      best_path = temp_path;
     }
   }
 
-  if (best_temp < 0) {
+  if (!best_path.has_value()) {
+    return std::nullopt;
+  }
+
+  cpu_temperature_path_ = best_path;
+  return cpu_temperature_path_;
+}
+
+std::string CpuProvider::readCpuTemperature() {
+  const auto temp_path = resolvedCpuTemperaturePath();
+  if (!temp_path.has_value()) {
     return "--";
   }
 
-  return std::to_string(static_cast<int>(std::lround(best_temp / 1000.0)));
+  const auto best_temp = readIntegerFile(*temp_path);
+  if (!best_temp.has_value() || *best_temp <= 0 || *best_temp > 150000) {
+    cpu_temperature_path_.reset();
+    return "--";
+  }
+
+  return std::to_string(static_cast<int>(std::lround(*best_temp / 1000.0)));
 }
 
 std::string CpuProvider::readCpuClock() {
+  resolveCpuClockPaths();
+  long long khz_max = 0;
+  for (const auto& path : cpu_clock_paths_) {
+    if (const auto candidate = readIntegerFile(path); candidate.has_value() && *candidate > 0) {
+      khz_max = std::max(khz_max, *candidate);
+    }
+  }
+
+  if (khz_max > 0) {
+    return std::to_string(static_cast<int>(std::lround(khz_max / 1000.0))) + "M";
+  }
+
   std::ifstream input("/proc/cpuinfo");
   std::string line;
   double mhz_max = 0.0;
@@ -309,32 +355,53 @@ std::string CpuProvider::readCpuClock() {
     return std::to_string(static_cast<int>(std::lround(mhz_max))) + "M";
   }
 
-  const std::filesystem::path cpufreq_root{"/sys/devices/system/cpu/cpufreq"};
-  std::error_code error;
-  if (std::filesystem::exists(cpufreq_root, error)) {
-    long long khz_max = 0;
+  return "--";
+}
 
-    for (const auto& entry : std::filesystem::directory_iterator(cpufreq_root, error)) {
-      if (error || !entry.is_directory(error)) {
-        continue;
-      }
-
-      const auto cpuinfo_cur = readIntegerFile(entry.path() / "cpuinfo_cur_freq");
-      const auto scaling_cur = readIntegerFile(entry.path() / "scaling_cur_freq");
-      const auto candidate = cpuinfo_cur.has_value() ? cpuinfo_cur : scaling_cur;
-      if (!candidate.has_value() || *candidate <= 0) {
-        continue;
-      }
-
-      khz_max = std::max(khz_max, *candidate);
+std::optional<std::filesystem::path> CpuProvider::resolvedCpuEnergyPath() {
+  if (cpu_energy_path_.has_value()) {
+    if (const auto energy = readIntegerFile(*cpu_energy_path_);
+        energy.has_value() && *energy >= 0) {
+      return cpu_energy_path_;
     }
-
-    if (khz_max > 0) {
-      return std::to_string(static_cast<int>(std::lround(khz_max / 1000.0))) + "M";
-    }
+    cpu_energy_path_.reset();
   }
 
-  return "--";
+  if (const auto energy = readCpuPackageEnergyMicrojoules(); energy.has_value()) {
+    cpu_energy_path_ = energy->source;
+    return cpu_energy_path_;
+  }
+
+  return std::nullopt;
+}
+
+void CpuProvider::resolveCpuClockPaths() {
+  if (cpu_clock_paths_resolved_) {
+    return;
+  }
+
+  cpu_clock_paths_resolved_ = true;
+  const std::filesystem::path cpufreq_root{"/sys/devices/system/cpu/cpufreq"};
+  std::error_code error;
+  if (!std::filesystem::exists(cpufreq_root, error)) {
+    return;
+  }
+
+  for (const auto& entry : std::filesystem::directory_iterator(cpufreq_root, error)) {
+    if (error || !entry.is_directory(error)) {
+      continue;
+    }
+
+    const auto cpuinfo_cur = entry.path() / "cpuinfo_cur_freq";
+    const auto scaling_cur = entry.path() / "scaling_cur_freq";
+    if (std::filesystem::exists(cpuinfo_cur, error)) {
+      cpu_clock_paths_.push_back(cpuinfo_cur);
+      continue;
+    }
+    if (std::filesystem::exists(scaling_cur, error)) {
+      cpu_clock_paths_.push_back(scaling_cur);
+    }
+  }
 }
 
 void CpuProvider::collect(core::MetricMap& metrics) {
@@ -355,29 +422,56 @@ void CpuProvider::collect(core::MetricMap& metrics) {
   previous_sample_ = current_sample;
 
   std::string cpu_power = "--";
-  if (const auto energy = readCpuPackageEnergyMicrojoules(); energy.has_value()) {
-    const auto now = std::chrono::steady_clock::now();
-    if (previous_energy_sample_.has_value() &&
-        previous_energy_sample_->source == energy->source &&
-        energy->microjoules >= previous_energy_sample_->microjoules) {
-      const auto elapsed =
-          std::chrono::duration<double>(now - previous_energy_sample_->timestamp).count();
-      if (elapsed > 0.0) {
-        const auto delta =
-            static_cast<double>(energy->microjoules - previous_energy_sample_->microjoules);
-        cpu_power = formatWatts((delta / elapsed) / 1000000.0);
+  if (const auto energy_path = resolvedCpuEnergyPath(); energy_path.has_value()) {
+    const auto energy_value = readIntegerFile(*energy_path);
+    if (energy_value.has_value() && *energy_value >= 0) {
+      const EnergyReading energy{
+          .source = energy_path->string(),
+          .microjoules = static_cast<std::uint64_t>(*energy_value),
+      };
+      const auto now = std::chrono::steady_clock::now();
+      if (previous_energy_sample_.has_value() &&
+          previous_energy_sample_->source == energy.source &&
+          energy.microjoules >= previous_energy_sample_->microjoules) {
+        const auto elapsed =
+            std::chrono::duration<double>(now - previous_energy_sample_->timestamp).count();
+        if (elapsed > 0.0) {
+          const auto delta =
+              static_cast<double>(energy.microjoules - previous_energy_sample_->microjoules);
+          cpu_power = formatWatts((delta / elapsed) / 1000000.0);
+        }
       }
+      previous_energy_sample_ = EnergySample{
+          .source = energy.source,
+          .microjoules = energy.microjoules,
+          .timestamp = now,
+      };
+    } else {
+      cpu_energy_path_.reset();
+      previous_energy_sample_.reset();
     }
-    previous_energy_sample_ = EnergySample{
-        .source = energy->source,
-        .microjoules = energy->microjoules,
-        .timestamp = now,
-    };
   } else {
     previous_energy_sample_.reset();
   }
 
-  const auto fan_metrics = readConfiguredCpuFanMetrics(fan_config_);
+  FanMetrics fan_metrics;
+  if (const auto fan_path = resolvedFanPath(); fan_path.has_value()) {
+    const auto rpm = readIntegerFile(*fan_path);
+    if (rpm.has_value() && *rpm >= 0) {
+      fan_metrics.rpm = std::to_string(*rpm);
+      if (fan_config_.max_rpm > 0) {
+        const double percent = std::clamp(
+            100.0 * static_cast<double>(*rpm) / static_cast<double>(fan_config_.max_rpm),
+            0.0,
+            100.0);
+        fan_metrics.percent = std::to_string(static_cast<int>(std::lround(percent)));
+      }
+    } else {
+      fan_path_.reset();
+    }
+  } else if (!fan_config_.rpm_path.empty()) {
+    fan_metrics = readConfiguredCpuFanMetrics(fan_config_);
+  }
 
   metrics["cpu.load"] =
       std::to_string(static_cast<int>(std::lround(last_load_percent_)));

@@ -1,0 +1,101 @@
+Start testing: Mar 14 10:00 MSK
+----------------------------------------------------------
+1/6 Testing: template_engine_smoke
+1/6 Test: template_engine_smoke
+Command: "/home/re/src/Sure-Smartie-linux/build-review/template_engine_smoke"
+Directory: /home/re/src/Sure-Smartie-linux/build-review
+"template_engine_smoke" start time: Mar 14 10:00 MSK
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"template_engine_smoke" end time: Mar 14 10:00 MSK
+"template_engine_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/6 Testing: core_services_smoke
+2/6 Test: core_services_smoke
+Command: "/home/re/src/Sure-Smartie-linux/build-review/core_services_smoke"
+Directory: /home/re/src/Sure-Smartie-linux/build-review
+"core_services_smoke" start time: Mar 14 10:00 MSK
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"core_services_smoke" end time: Mar 14 10:00 MSK
+"core_services_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/6 Testing: plugin_loader_smoke
+3/6 Test: plugin_loader_smoke
+Command: "/home/re/src/Sure-Smartie-linux/build-review/plugin_loader_smoke" "/home/re/src/Sure-Smartie-linux/build-review/sure_smartie_demo_plugin.so"
+Directory: /home/re/src/Sure-Smartie-linux/build-review
+"plugin_loader_smoke" start time: Mar 14 10:00 MSK
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"plugin_loader_smoke" end time: Mar 14 10:00 MSK
+"plugin_loader_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/6 Testing: config_validation_smoke
+4/6 Test: config_validation_smoke
+Command: "/home/re/src/Sure-Smartie-linux/build-review/sure-smartie-linux" "--config" "/home/re/src/Sure-Smartie-linux/configs/stdout-example.json" "--validate-config"
+Directory: /home/re/src/Sure-Smartie-linux/build-review
+"config_validation_smoke" start time: Mar 14 10:00 MSK
+Output:
+----------------------------------------------------------
+config ok
+device: /dev/null
+display: stdout 20x4
+providers: 5
+plugins: 0
+screens: 1
+validation: ok
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"config_validation_smoke" end time: Mar 14 10:00 MSK
+"config_validation_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/6 Testing: backlight_command_smoke
+5/6 Test: backlight_command_smoke
+Command: "/home/re/src/Sure-Smartie-linux/build-review/sure-smartie-linux" "--config" "/home/re/src/Sure-Smartie-linux/configs/stdout-example.json" "--backlight" "off"
+Directory: /home/re/src/Sure-Smartie-linux/build-review
+"backlight_command_smoke" start time: Mar 14 10:00 MSK
+Output:
+----------------------------------------------------------
+level=info component=main msg="backlight command applied" backlight="off"
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"backlight_command_smoke" end time: Mar 14 10:00 MSK
+"backlight_command_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/6 Testing: gui_smoke
+6/6 Test: gui_smoke
+Command: "/home/re/src/Sure-Smartie-linux/build-review/gui_smoke"
+Directory: /home/re/src/Sure-Smartie-linux
+"gui_smoke" start time: Mar 14 10:00 MSK
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.24 sec
+----------------------------------------------------------
+Test Passed.
+"gui_smoke" end time: Mar 14 10:00 MSK
+"gui_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Mar 14 10:00 MSK

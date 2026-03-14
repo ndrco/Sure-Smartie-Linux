@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+  <vendor>Sure Smartie Linux</vendor>
+
+  <action id="io.sure_smartie_linux.save_system_config">
+    <description>Save the Sure Smartie system configuration</description>
+    <message>Authentication is required to update the Sure Smartie system configuration.</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">@CMAKE_INSTALL_FULL_LIBEXECDIR@/sure-smartie-linux/sure-smartie-privileged-save</annotate>
+  </action>
+</policyconfig>

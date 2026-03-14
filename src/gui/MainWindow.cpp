@@ -4,6 +4,7 @@
 #include <chrono>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <optional>
 #include <string>
 #include <utility>
@@ -14,7 +15,9 @@
 #include <QCloseEvent>
 #include <QColor>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFormLayout>
 #include <QFrame>
 #include <QGridLayout>
@@ -27,13 +30,16 @@
 #include <QLayout>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QProcess>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSpinBox>
+#include <QStandardPaths>
 #include <QStyle>
 #include <QSplitter>
 #include <QStatusBar>
 #include <QStringList>
+#include <QTemporaryFile>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -56,6 +62,80 @@ QString toQString(const std::filesystem::path& path) {
 
 std::filesystem::path toPath(const QString& path) {
   return std::filesystem::path(path.toStdString());
+}
+
+std::filesystem::path normalizePath(const std::filesystem::path& path) {
+  std::error_code error;
+  const auto absolute = std::filesystem::absolute(path, error);
+  return (error ? path : absolute).lexically_normal();
+}
+
+#ifdef SURE_SMARTIE_DEFAULT_CONFIG_PATH
+std::filesystem::path systemConfigPath() {
+  return normalizePath(std::filesystem::path{SURE_SMARTIE_DEFAULT_CONFIG_PATH});
+}
+
+std::filesystem::path systemConfigExamplePath() {
+  return normalizePath(std::filesystem::path{
+      std::string{SURE_SMARTIE_DEFAULT_CONFIG_PATH} + ".example"});
+}
+
+bool isSystemConfigPath(const std::filesystem::path& path) {
+  return normalizePath(path) == systemConfigPath();
+}
+
+bool isSystemConfigExamplePath(const std::filesystem::path& path) {
+  return normalizePath(path) == systemConfigExamplePath();
+}
+#else
+bool isSystemConfigPath(const std::filesystem::path& path) {
+  Q_UNUSED(path);
+  return false;
+}
+
+bool isSystemConfigExamplePath(const std::filesystem::path& path) {
+  Q_UNUSED(path);
+  return false;
+}
+#endif
+
+bool isPermissionLikeSaveError(const QString& message) {
+  const QString lowered = message.toLower();
+  return lowered.contains("unable to open config for writing") ||
+         lowered.contains("permission denied") ||
+         lowered.contains("operation not permitted") ||
+         lowered.contains("read-only");
+}
+
+QString suggestedSavePath(const std::filesystem::path& current_path) {
+#ifdef SURE_SMARTIE_DEFAULT_CONFIG_PATH
+  if (current_path.empty()) {
+    return QString::fromStdString(systemConfigPath().string());
+  }
+  if (isSystemConfigExamplePath(current_path)) {
+    return QString::fromStdString(systemConfigPath().string());
+  }
+#endif
+  return current_path.empty() ? QString{} : toQString(current_path);
+}
+
+QString findPrivilegedSaveHelperPath() {
+  const QString application_dir = QCoreApplication::applicationDirPath();
+  const QString local_helper =
+      QFileInfo(application_dir + "/sure-smartie-privileged-save").absoluteFilePath();
+  if (QFileInfo::exists(local_helper) && QFileInfo(local_helper).isExecutable()) {
+    return local_helper;
+  }
+
+#ifdef SURE_SMARTIE_PRIVILEGED_SAVE_HELPER_PATH
+  const QString installed_helper =
+      QStringLiteral(SURE_SMARTIE_PRIVILEGED_SAVE_HELPER_PATH);
+  if (QFileInfo::exists(installed_helper) && QFileInfo(installed_helper).isExecutable()) {
+    return installed_helper;
+  }
+#endif
+
+  return {};
 }
 
 QString screenLabel(const core::ScreenDefinition& screen, int index) {
@@ -179,13 +259,15 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), config_(makeDefau
   refreshPreview(true);
 }
 
-MainWindow::~MainWindow() = default;
+MainWindow::~MainWindow() { discardPendingMetricsCollection(); }
 
 bool MainWindow::loadConfigFile(const QString& path, QString* error_message) {
   try {
+    discardPendingMetricsCollection();
     config_ = core::ConfigLoader::loadFromFile(toPath(path));
     current_config_path_ = toPath(path);
     metrics_service_dirty_ = true;
+    ++metrics_epoch_;
     last_metrics_.clear();
     preview_diagnostics_.clear();
     rotation_manager_.reset();
@@ -214,8 +296,14 @@ bool MainWindow::saveConfigFile(const QString& path, QString* error_message) {
     statusBar()->showMessage(QString("Saved %1").arg(path), 2500);
     return true;
   } catch (const std::exception& error) {
+    const QString save_error = error.what();
+    const auto target_path = toPath(path);
+    if (isSystemConfigPath(target_path) && isPermissionLikeSaveError(save_error)) {
+      return saveConfigFilePrivileged(path, false, error_message);
+    }
+
     if (error_message != nullptr) {
-      *error_message = error.what();
+      *error_message = save_error;
     }
     return false;
   }
@@ -290,14 +378,18 @@ void MainWindow::buildUi() {
   connect(save_action, &QAction::triggered, this, [this]() {
     QString error_message;
     if (!saveCurrentConfig(false, &error_message)) {
-      QMessageBox::critical(this, "Save failed", error_message);
+      if (!error_message.isEmpty()) {
+        QMessageBox::critical(this, "Save failed", error_message);
+      }
     }
   });
 
   connect(save_as_action, &QAction::triggered, this, [this]() {
     QString error_message;
     if (!saveCurrentConfig(true, &error_message)) {
-      QMessageBox::critical(this, "Save failed", error_message);
+      if (!error_message.isEmpty()) {
+        QMessageBox::critical(this, "Save failed", error_message);
+      }
     }
   });
 
@@ -921,7 +1013,7 @@ void MainWindow::buildUi() {
           [this](int value) { preview_timer_->setInterval(value); });
 
   connect(refresh_button, &QPushButton::clicked, this, [this]() { refreshPreview(true); });
-  connect(preview_timer_, &QTimer::timeout, this, [this]() { refreshPreview(true); });
+  connect(preview_timer_, &QTimer::timeout, this, [this]() { requestAsyncPreviewRefresh(); });
 
   connect(validation_list_, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
     focusFieldPath(item->data(Qt::UserRole).toString());
@@ -1170,13 +1262,15 @@ void MainWindow::updateFooterActions() {
   }
 }
 
-bool MainWindow::saveCurrentConfig(bool force_prompt, QString* error_message) {
-  QString target_path = currentConfigPath();
+bool MainWindow::saveCurrentConfig(bool force_prompt,
+                                   QString* error_message,
+                                   bool restart_service) {
+  QString target_path = suggestedSavePath(current_config_path_);
   if (force_prompt || target_path.isEmpty()) {
     target_path = QFileDialog::getSaveFileName(
         this,
         force_prompt ? "Save config as" : "Save config",
-        currentConfigPath().isEmpty() ? "sure-smartie.json" : currentConfigPath(),
+        target_path.isEmpty() ? "sure-smartie.json" : target_path,
         "JSON files (*.json)");
     if (target_path.isEmpty()) {
       if (error_message != nullptr) {
@@ -1186,20 +1280,141 @@ bool MainWindow::saveCurrentConfig(bool force_prompt, QString* error_message) {
     }
   }
 
+  if (restart_service && isSystemConfigPath(toPath(target_path))) {
+    return saveConfigFilePrivileged(target_path, true, error_message);
+  }
+
   return saveConfigFile(target_path, error_message);
 }
 
-bool MainWindow::applyCurrentConfig(QString* error_message) {
-  if (!saveCurrentConfig(false, error_message)) {
+bool MainWindow::saveConfigFilePrivileged(const QString& path,
+                                          bool restart_service,
+                                          QString* error_message) {
+  QMessageBox dialog(this);
+  dialog.setWindowTitle("Administrator access required");
+  dialog.setIcon(QMessageBox::Question);
+  dialog.setText(restart_service
+                     ? "Applying the system config requires administrator privileges."
+                     : "Saving the system config requires administrator privileges.");
+  dialog.setInformativeText(
+      QString("Authenticate to %1 %2 using the system password dialog.")
+          .arg(restart_service ? "save and apply" : "update")
+          .arg(path));
+  dialog.setStandardButtons(QMessageBox::Save | QMessageBox::Cancel);
+  dialog.setDefaultButton(QMessageBox::Save);
+  dialog.button(QMessageBox::Save)
+      ->setText(restart_service ? "Authenticate, Save, and Apply"
+                                : "Authenticate and Save");
+
+  if (dialog.exec() != QMessageBox::Save) {
+    if (error_message != nullptr) {
+      error_message->clear();
+    }
     return false;
   }
 
+  const QString helper_path = findPrivilegedSaveHelperPath();
+  if (helper_path.isEmpty()) {
+    if (error_message != nullptr) {
+      *error_message =
+          "The privileged save helper is not installed. Reinstall sure-smartie-linux.";
+    }
+    return false;
+  }
+
+  const QString pkexec_path = QStandardPaths::findExecutable("pkexec");
+  if (pkexec_path.isEmpty()) {
+    if (error_message != nullptr) {
+      *error_message =
+          "pkexec is not available on this system, so administrator save cannot start.";
+    }
+    return false;
+  }
+
+  QTemporaryFile temporary_file(QDir::tempPath() + "/sure-smartie-config-XXXXXX.json");
+  temporary_file.setAutoRemove(true);
+  if (!temporary_file.open()) {
+    if (error_message != nullptr) {
+      *error_message = "Unable to create a temporary config file for privileged save.";
+    }
+    return false;
+  }
+
+  const std::string serialized = core::ConfigSerializer::serialize(config_);
+  if (temporary_file.write(serialized.data(),
+                           static_cast<qint64>(serialized.size())) !=
+      static_cast<qint64>(serialized.size())) {
+    if (error_message != nullptr) {
+      *error_message = "Unable to stage the temporary config for privileged save.";
+    }
+    return false;
+  }
+  temporary_file.flush();
+  temporary_file.close();
+
+  QProcess process(this);
+  process.setProcessChannelMode(QProcess::MergedChannels);
+  QStringList arguments;
+  arguments << helper_path;
+  if (restart_service) {
+    arguments << "--restart-service";
+  }
+  arguments << temporary_file.fileName() << path;
+  process.start(pkexec_path, arguments);
+  if (!process.waitForStarted()) {
+    if (error_message != nullptr) {
+      *error_message = "Unable to start the administrator authentication helper.";
+    }
+    return false;
+  }
+
+  process.waitForFinished(-1);
+  const QString output =
+      QString::fromUtf8(process.readAllStandardOutput()).trimmed();
+
+  if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+    if (error_message != nullptr) {
+      if (process.exitCode() == 126) {
+        *error_message = "Administrator authentication was cancelled.";
+      } else if (process.exitCode() == 127) {
+        *error_message = output.isEmpty()
+                             ? "Administrator authentication failed."
+                             : output;
+      } else {
+        *error_message = output.isEmpty()
+                             ? "Privileged save failed."
+                             : output;
+      }
+    }
+    return false;
+  }
+
+  current_config_path_ = toPath(path);
+  setDirty(false);
+  statusBar()->showMessage(
+      QString("Saved %1 with administrator privileges").arg(path), 3000);
+  return true;
+}
+
+bool MainWindow::applyCurrentConfig(QString* error_message) {
+  const QString target_path = suggestedSavePath(current_config_path_);
+  const bool should_restart_service =
+      !target_path.isEmpty() && isSystemConfigPath(toPath(target_path));
+  if (!saveCurrentConfig(false, error_message, should_restart_service)) {
+    return false;
+  }
+
+  discardPendingMetricsCollection();
   metrics_service_dirty_ = true;
+  ++metrics_epoch_;
   last_metrics_.clear();
   preview_diagnostics_.clear();
   resetRotationPreview();
   refreshPreview(true);
-  statusBar()->showMessage("Config saved and preview refreshed", 2500);
+  statusBar()->showMessage(
+      should_restart_service ? "Config saved, service restarted, and preview refreshed"
+                             : "Config saved and preview refreshed",
+      3000);
   return true;
 }
 
@@ -1209,8 +1424,10 @@ void MainWindow::revertCurrentConfig() {
   }
 
   if (current_config_path_.empty()) {
+    discardPendingMetricsCollection();
     config_ = makeDefaultConfig();
     metrics_service_dirty_ = true;
+    ++metrics_epoch_;
     last_metrics_.clear();
     preview_diagnostics_.clear();
     rotation_manager_.reset();
@@ -1568,6 +1785,73 @@ void MainWindow::rebuildMetricsService() {
   metrics_service_dirty_ = false;
 }
 
+void MainWindow::startAsyncMetricsCollection() {
+  if (metrics_collection_in_flight_) {
+    return;
+  }
+
+  if (metrics_service_dirty_) {
+    rebuildMetricsService();
+  }
+  if (metrics_service_ == nullptr) {
+    return;
+  }
+
+  auto* service = metrics_service_.get();
+  const auto epoch = metrics_epoch_;
+  metrics_collection_in_flight_ = true;
+  pending_metrics_future_ = std::async(
+      std::launch::async,
+      [service, epoch]() -> std::tuple<std::uint64_t,
+                                       core::MetricMap,
+                                       std::vector<core::Diagnostic>> {
+        auto metrics = service->collect();
+        auto diagnostics = service->lastDiagnostics();
+        return {epoch, std::move(metrics), std::move(diagnostics)};
+      });
+}
+
+bool MainWindow::applyPendingMetricsCollectionIfReady(bool block) {
+  if (!metrics_collection_in_flight_ || !pending_metrics_future_.valid()) {
+    return false;
+  }
+
+  if (!block &&
+      pending_metrics_future_.wait_for(std::chrono::milliseconds{0}) !=
+          std::future_status::ready) {
+    return false;
+  }
+
+  auto [epoch, metrics, diagnostics] = pending_metrics_future_.get();
+  metrics_collection_in_flight_ = false;
+  if (epoch != metrics_epoch_ || metrics_service_dirty_) {
+    return false;
+  }
+
+  last_metrics_ = std::move(metrics);
+  preview_diagnostics_ = std::move(diagnostics);
+  return true;
+}
+
+void MainWindow::discardPendingMetricsCollection() {
+  if (!metrics_collection_in_flight_) {
+    return;
+  }
+  if (pending_metrics_future_.valid()) {
+    pending_metrics_future_.wait();
+    pending_metrics_future_.get();
+  }
+  metrics_collection_in_flight_ = false;
+}
+
+void MainWindow::requestAsyncPreviewRefresh() {
+  applyPendingMetricsCollectionIfReady(false);
+  if (!metrics_collection_in_flight_) {
+    startAsyncMetricsCollection();
+  }
+  refreshPreview(false);
+}
+
 void MainWindow::resetRotationPreview() {
   rotation_manager_.reset();
   if (config_.screens.empty()) {
@@ -1586,11 +1870,17 @@ void MainWindow::resetRotationPreview() {
 }
 
 void MainWindow::refreshPreview(bool recollect_metrics) {
-  if (metrics_service_dirty_) {
+  if (recollect_metrics) {
+    discardPendingMetricsCollection();
+  } else {
+    applyPendingMetricsCollectionIfReady(false);
+  }
+
+  if (metrics_service_dirty_ && (recollect_metrics || !metrics_collection_in_flight_)) {
     rebuildMetricsService();
   }
 
-  if (recollect_metrics || last_metrics_.empty()) {
+  if (recollect_metrics || (last_metrics_.empty() && !metrics_collection_in_flight_)) {
     if (metrics_service_ != nullptr) {
       last_metrics_ = metrics_service_->collect();
       preview_diagnostics_ = metrics_service_->lastDiagnostics();
@@ -1644,6 +1934,9 @@ void MainWindow::refreshPreview(bool recollect_metrics) {
 
   if (rotation_preview_check_->isChecked() && config_.screens.size() > 1) {
     status += QString(" | %1 screens").arg(config_.screens.size());
+  }
+  if (metrics_collection_in_flight_) {
+    status += " | refreshing metrics";
   }
   if (diagnosticsHaveErrors(core::ConfigValidator::validate(config_))) {
     status += " | invalid config";
@@ -1918,7 +2211,9 @@ void MainWindow::markConfigEdited(bool metrics_service_changed,
                                   bool rebuild_rotation_preview) {
   setDirty(true);
   if (metrics_service_changed) {
+    discardPendingMetricsCollection();
     metrics_service_dirty_ = true;
+    ++metrics_epoch_;
     preview_diagnostics_.clear();
   }
   if (rebuild_rotation_preview) {

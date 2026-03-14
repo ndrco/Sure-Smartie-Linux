@@ -69,6 +69,19 @@ cmake --build build
 4. `configs/sure-example.json`;
 5. `configs/stdout-example.json`.
 
+Если GUI открыт на системном `/usr/local/etc/sure-smartie-linux/config.json`, то при
+обычном `Save` он сначала пробует запись от текущего пользователя, а при отказе по правам
+предлагает сохранить через системный Polkit-диалог (`pkexec`), не запуская весь GUI от root.
+
+Кнопка `Apply` в этом режиме:
+
+- сохраняет системный `config.json`;
+- перезапускает настроенный systemd unit;
+- обновляет локальный preview в GUI.
+
+Если в `/usr/local/etc/default/sure-smartie-linux` задан
+`SURE_SMARTIE_SERVICE_NAME=...`, будет использован именно этот unit.
+
 ### 3. Применение на реальном устройстве
 
 Самый простой вариант установки для обычного пользователя:
@@ -377,7 +390,7 @@ GPU {gpu.power_w}W {glyph:bolt}
 
 ### 5. Пользовательские glyph-ы
 
-В GUI появился отдельный блок `Custom Glyphs`.
+В GUI есть отдельный блок `Custom Glyphs`.
 
 Что в нём можно сделать:
 

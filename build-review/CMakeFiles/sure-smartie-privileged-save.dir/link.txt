@@ -1,0 +1,1 @@
+/usr/bin/c++ "CMakeFiles/sure-smartie-privileged-save.dir/src/gui/PrivilegedSaveHelper.cpp.o" -o sure-smartie-privileged-save 

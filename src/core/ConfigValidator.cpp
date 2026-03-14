@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -207,6 +208,7 @@ void validateTemplateLine(std::vector<Diagnostic>& diagnostics,
 
 std::vector<Diagnostic> ConfigValidator::validate(const AppConfig& config) {
   std::vector<Diagnostic> diagnostics;
+  std::size_t worst_case_active_glyphs = 0;
 
   if (config.display.type.empty()) {
     addDiagnostic(diagnostics,
@@ -422,12 +424,34 @@ std::vector<Diagnostic> ConfigValidator::validate(const AppConfig& config) {
     const int reserved_slots = glyph_usage.uses_bar ? 6 : 0;
     const int available_custom_slots =
         static_cast<int>(kGlyphSlotCount) - reserved_slots;
+    worst_case_active_glyphs = std::max(
+        worst_case_active_glyphs,
+        glyph_usage.custom_names.size() + static_cast<std::size_t>(reserved_slots));
     if (static_cast<int>(glyph_usage.custom_names.size()) > available_custom_slots) {
       addDiagnostic(
           diagnostics,
           DiagnosticSeverity::error,
           screen_prefix + ".lines",
           "screen uses more custom glyphs than the LCD can keep alongside built-in glyphs");
+    }
+  }
+
+  if (config.display.type == "sure" && config.baudrate > 0 &&
+      config.display.cols > 0 && config.display.rows > 0 &&
+      config.refresh_interval.count() > 0) {
+    const double frame_bytes =
+        static_cast<double>(config.display.rows * (config.display.cols + 4)) +
+        static_cast<double>(worst_case_active_glyphs * 11);
+    const double minimum_refresh_ms =
+        std::ceil(((frame_bytes * 10.0) / static_cast<double>(config.baudrate)) *
+                  1000.0 * 1.5);
+    if (static_cast<double>(config.refresh_interval.count()) < minimum_refresh_ms) {
+      addDiagnostic(
+          diagnostics,
+          DiagnosticSeverity::warning,
+          "refresh_ms",
+          "refresh interval is aggressive for the configured serial baudrate and may cause"
+          " delayed or unstable display updates");
     }
   }
 

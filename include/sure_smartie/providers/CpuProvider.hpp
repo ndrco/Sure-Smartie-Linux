@@ -2,8 +2,10 @@
 
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "sure_smartie/providers/IProvider.hpp"
 
@@ -38,13 +40,22 @@ class CpuProvider : public IProvider {
   };
 
   static std::optional<CpuTimes> readCpuTimes();
-  static std::string readCpuTemperature();
-  static std::string readCpuClock();
+  std::string readCpuTemperature();
+  std::string readCpuClock();
+  std::optional<std::filesystem::path> resolvedFanPath();
+  std::optional<std::filesystem::path> resolvedCpuTemperaturePath();
+  std::optional<std::filesystem::path> resolvedCpuEnergyPath();
+  void resolveCpuClockPaths();
 
   core::CpuFanConfig fan_config_;
   std::optional<CpuTimes> previous_sample_;
   std::optional<EnergySample> previous_energy_sample_;
   double last_load_percent_{0.0};
+  std::optional<std::filesystem::path> fan_path_;
+  std::optional<std::filesystem::path> cpu_temperature_path_;
+  std::optional<std::filesystem::path> cpu_energy_path_;
+  std::vector<std::filesystem::path> cpu_clock_paths_;
+  bool cpu_clock_paths_resolved_{false};
 };
 
 }  // namespace sure_smartie::providers

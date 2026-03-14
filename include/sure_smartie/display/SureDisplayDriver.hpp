@@ -25,13 +25,14 @@ class SureDisplayDriver : public IDisplay {
   void setBacklight(bool on) override;
   void setContrast(std::uint8_t value) override;
   void setBrightness(std::uint8_t value) override;
- void uploadCustomCharacter(std::uint8_t index,
+  void uploadCustomCharacter(std::uint8_t index,
                              const std::array<std::uint8_t, 8>& pattern) override;
 
  private:
   static std::string sanitizeText(std::string text, std::size_t width);
   void writeLine(std::size_t row, const std::string& text);
   void writeBytes(std::initializer_list<std::uint8_t> bytes);
+  void resetRenderCache();
 
   serial::SerialPort serial_;
   core::DisplayGeometry geometry_;
@@ -39,6 +40,9 @@ class SureDisplayDriver : public IDisplay {
   std::uint8_t contrast_;
   std::uint8_t brightness_;
   bool initialized_{false};
+  core::Frame last_frame_;
+  std::array<bool, core::kGlyphSlotCount> uploaded_glyphs_{};
+  std::array<std::array<std::uint8_t, 8>, core::kGlyphSlotCount> glyph_patterns_{};
 };
 
 }  // namespace sure_smartie::display

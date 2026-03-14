@@ -191,9 +191,8 @@ int App::run() {
             "app",
             "render cycle failed",
             {{"error", error.what()}});
+        display_->release();
       }
-
-      display_->release();
 
       next_tick += refresh_interval;
       std::this_thread::sleep_until(next_tick);

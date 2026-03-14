@@ -1,0 +1,7 @@
+template_engine_smoke 3 0.000581689
+core_services_smoke 3 0.0115066
+plugin_loader_smoke 3 0.000820317
+config_validation_smoke 3 0.00121958
+backlight_command_smoke 3 0.00184901
+gui_smoke 3 0.0810949
+---

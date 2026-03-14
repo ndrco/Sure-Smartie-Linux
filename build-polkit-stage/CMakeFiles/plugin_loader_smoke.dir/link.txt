@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/plugin_loader_smoke.dir/tests/plugin_loader_smoke.cpp.o -o plugin_loader_smoke  libsure_smartie_core.a -ldl 

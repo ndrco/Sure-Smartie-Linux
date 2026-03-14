@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/template_engine_smoke.dir/tests/template_engine_smoke.cpp.o -o template_engine_smoke  libsure_smartie_core.a -ldl 

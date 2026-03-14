@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/gui_smoke.dir/tests/gui_smoke.cpp.o -o gui_smoke  libsure_smartie_gui.a /usr/lib/x86_64-linux-gnu/libQt6Widgets.so.6.4.2 /usr/lib/x86_64-linux-gnu/libQt6Gui.so.6.4.2 /usr/lib/x86_64-linux-gnu/libQt6Core.so.6.4.2 /usr/lib/x86_64-linux-gnu/libGLX.so /usr/lib/x86_64-linux-gnu/libOpenGL.so libsure_smartie_core.a -ldl 

@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/core_services_smoke.dir/tests/core_services_smoke.cpp.o -o core_services_smoke  libsure_smartie_core.a -ldl 
