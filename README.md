@@ -149,6 +149,15 @@ Staging install without touching the system:
 cmake --install build --prefix ./build/install
 ```
 
+Release archives for GitHub Releases:
+
+```bash
+./scripts/package-release.sh v0.1.0
+```
+
+This creates portable and staged install archives under `dist/` together with
+`SHA256SUMS` for upload to a GitHub Release.
+
 ## Run
 
 Dry-run on stdout:

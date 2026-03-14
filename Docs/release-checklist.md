@@ -18,6 +18,20 @@ ctest --test-dir build --output-on-failure
 ./build/sure-smartie-linux --config configs/stdout-example.json --once
 ```
 
+## Release assets
+
+Build reproducible release archives for a tag:
+
+```bash
+./scripts/package-release.sh v0.1.0
+```
+
+This produces:
+
+- `dist/Sure-Smartie-Linux-v0.1.0-linux-<arch>-portable.tar.gz`
+- `dist/Sure-Smartie-Linux-v0.1.0-linux-<arch>-install-rootfs.tar.gz`
+- `dist/Sure-Smartie-Linux-v0.1.0-SHA256SUMS.txt`
+
 ## Optional manual checks
 
 - physical display output

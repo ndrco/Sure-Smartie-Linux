@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+version="${1:-v0.1.0}"
+build_dir="${BUILD_DIR:-build-release}"
+dist_dir="${DIST_DIR:-dist}"
+arch="${ARCH:-$(uname -m)}"
+build_type="${BUILD_TYPE:-Release}"
+build_gui="${SURE_SMARTIE_BUILD_GUI:-ON}"
+build_tests="${SURE_SMARTIE_BUILD_TESTS:-OFF}"
+
+generator_args=()
+if [[ -n "${CMAKE_GENERATOR:-}" ]]; then
+  generator_args=(-G "$CMAKE_GENERATOR")
+elif command -v ninja >/dev/null 2>&1; then
+  generator_args=(-G Ninja)
+else
+  generator_args=(-G "Unix Makefiles")
+fi
+
+asset_prefix="Sure-Smartie-Linux-${version}-linux-${arch}"
+portable_root="${dist_dir}/${asset_prefix}-portable"
+stage_root="${dist_dir}/${asset_prefix}-stage"
+portable_tree="${portable_root}/portable"
+checksums_file="${dist_dir}/Sure-Smartie-Linux-${version}-SHA256SUMS.txt"
+portable_tar="${dist_dir}/${asset_prefix}-portable.tar.gz"
+install_tar="${dist_dir}/${asset_prefix}-install-rootfs.tar.gz"
+
+mkdir -p "$dist_dir"
+
+cmake -S . -B "$build_dir" \
+  "${generator_args[@]}" \
+  -DCMAKE_BUILD_TYPE="$build_type" \
+  -DSURE_SMARTIE_BUILD_GUI="$build_gui" \
+  -DSURE_SMARTIE_BUILD_TESTS="$build_tests"
+
+cmake --build "$build_dir" -j"$(nproc)"
+
+rm -rf "$portable_root" "$stage_root"
+install -d \
+  "${portable_tree}/bin" \
+  "${portable_tree}/lib/sure-smartie-linux/plugins" \
+  "${portable_tree}/libexec/sure-smartie-linux" \
+  "${portable_tree}/examples" \
+  "${portable_tree}/docs"
+
+install -m 755 "${build_dir}/sure-smartie-linux" "${portable_tree}/bin/"
+
+if [[ -f "${build_dir}/sure-smartie-gui" ]]; then
+  install -m 755 "${build_dir}/sure-smartie-gui" "${portable_tree}/bin/"
+fi
+
+if [[ -f "${build_dir}/sure-smartie-privileged-save" ]]; then
+  install -m 755 "${build_dir}/sure-smartie-privileged-save" \
+    "${portable_tree}/libexec/sure-smartie-linux/"
+fi
+
+if [[ -f "${build_dir}/sure_smartie_demo_plugin.so" ]]; then
+  install -m 755 "${build_dir}/sure_smartie_demo_plugin.so" \
+    "${portable_tree}/lib/sure-smartie-linux/plugins/"
+fi
+
+for file in \
+  configs/stdout-example.json \
+  configs/plugin-example.json \
+  README.md \
+  LICENSE \
+  Docs/releases/"${version}".md
+do
+  if [[ -f "$file" ]]; then
+    install -m 644 "$file" "${portable_tree}/docs/"
+  fi
+done
+
+if [[ -f configs/stdout-example.json ]]; then
+  install -m 644 configs/stdout-example.json "${portable_tree}/examples/"
+fi
+
+if [[ -f configs/plugin-example.json ]]; then
+  install -m 644 configs/plugin-example.json "${portable_tree}/examples/"
+fi
+
+for file in \
+  sure-smartie-gui.desktop \
+  sure-smartie-gui-save.policy \
+  sure-smartie-linux.service \
+  sure-smartie-linux-root.service \
+  sure-smartie-linux.env \
+  sure-smartie-linux-sleep.sh
+do
+  if [[ -f "${build_dir}/${file}" ]]; then
+    install -m 644 "${build_dir}/${file}" "${portable_tree}/docs/"
+  fi
+done
+
+env DESTDIR="$stage_root" cmake --install "$build_dir" --prefix /usr
+
+if command -v strip >/dev/null 2>&1; then
+  find "${portable_tree}" "$stage_root" -type f \( -perm -111 -o -name "*.so" \) \
+    -exec strip --strip-unneeded {} + 2>/dev/null || true
+fi
+
+tar -C "$portable_root" -czf "$portable_tar" portable
+tar -C "$stage_root" -czf "$install_tar" usr
+
+sha256sum "$install_tar" "$portable_tar" > "$checksums_file"
+
+printf 'Created:\n'
+printf '  %s\n' "$portable_tar"
+printf '  %s\n' "$install_tar"
+printf '  %s\n' "$checksums_file"
