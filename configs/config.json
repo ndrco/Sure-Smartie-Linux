@@ -1,0 +1,63 @@
+{
+  "baudrate": 9600,
+  "cpu_fan": {
+    "max_rpm": 1800,
+    "rpm_path": "/sys/class/hwmon/hwmon9/fan3_input"
+  },
+  "custom_glyphs": [
+    {
+      "name": "Grad",
+      "rows": [
+        4,
+        10,
+        10,
+        4,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "Fan",
+      "rows": [
+        14,
+        28,
+        28,
+        12,
+        6,
+        7,
+        7,
+        14
+      ]
+    }
+  ],
+  "device": "/dev/ttyUSB1",
+  "display": {
+    "backlight": true,
+    "brightness": 192,
+    "cols": 20,
+    "contrast": 132,
+    "rows": 4,
+    "type": "sure"
+  },
+  "plugin_paths": [],
+  "providers": [
+    "cpu",
+    "gpu",
+    "ram"
+  ],
+  "refresh_ms": 750,
+  "screens": [
+    {
+      "interval_ms": 2000,
+      "lines": [
+        "C:{cpu.clock} {at:10}{cpu.load}%{at:15}{bar:ram.percent,6}",
+        "{cpu.power_w}W{at:6}{cpu.temp}{glyph:Grad}{at:10}{glyph:Fan}{cpu.fan_percent}%{at:16}{ram.used_gb}",
+        "G:{gpu.clock}{at:10}{gpu.load}%{at:15}{bar:gpu.mem_percent,6}",
+        "{gpu.power_w}W{at:6}{gpu.temp}{glyph:Grad}{at:10}{glyph:Fan}{gpu.fan_percent}%{at:16}{gpu.mem_used}"
+      ],
+      "name": "screen_1"
+    }
+  ]
+}
