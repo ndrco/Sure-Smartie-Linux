@@ -1,0 +1,29 @@
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+      - dependencies
+  categories:
+    - title: CLI and Runtime
+      labels:
+        - cli
+        - runtime
+    - title: GUI
+      labels:
+        - gui
+        - ux
+    - title: Providers and Metrics
+      labels:
+        - provider
+        - metrics
+    - title: Packaging and Deployment
+      labels:
+        - packaging
+        - systemd
+        - install
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Other Changes
+      labels:
+        - "*"

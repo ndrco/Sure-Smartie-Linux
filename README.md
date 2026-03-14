@@ -1,6 +1,25 @@
 # Sure-Smartie-linux
 
+[![CI](https://github.com/ndrco/Sure-Smartie-Linux/actions/workflows/ci.yml/badge.svg)](https://github.com/ndrco/Sure-Smartie-Linux/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/ndrco/Sure-Smartie-Linux/blob/main/LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/ndrco/Sure-Smartie-Linux)](https://github.com/ndrco/Sure-Smartie-Linux/releases)
+[![GitHub issues](https://img.shields.io/github/issues/ndrco/Sure-Smartie-Linux)](https://github.com/ndrco/Sure-Smartie-Linux/issues)
+
 Linux-oriented C++20 utility for SURE Electronics 20x4 LCD Smartie Asset displays.
+
+Repository: <https://github.com/ndrco/Sure-Smartie-Linux>
+
+## Highlights
+
+- native serial driver for SURE LCD Smartie Asset displays
+- configurable CLI runtime and optional Qt6 GUI editor
+- built-in CPU, GPU, RAM, system, and network providers
+- install scripts, systemd units, sysusers, and Polkit integration
+- plugin SDK and sample runtime-loadable provider plugin
+
+## Maintainer
+
+NDRco <ndrco@yahoo.com>
 
 ## Current state
 
@@ -57,6 +76,13 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+Dependencies for the full build on Ubuntu 24.04 are typically:
+
+- CMake 3.24+
+- a C++20 compiler
+- POSIX serial support
+- Qt6 Widgets for the GUI target
+
 GUI build is enabled by default through `SURE_SMARTIE_BUILD_GUI=ON`.
 If Qt6 Widgets is not available, CMake keeps building the CLI/core targets and
 prints a status message that `sure-smartie-gui` was skipped.
@@ -108,6 +134,20 @@ sudo cmake --install build
 ```
 
 By default this installs into `/usr/local`.
+
+## Development
+
+Headless and CI-friendly smoke testing:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+Staging install without touching the system:
+
+```bash
+cmake --install build --prefix ./build/install
+```
 
 ## Run
 
@@ -258,6 +298,24 @@ For suspend/resume handling, the installed sleep hook now:
 
 - sends `--backlight off` before suspend
 - sends `--backlight on` after resume
+
+## Contributing
+
+Project contribution guidance lives in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Security
+
+Please use the process in [SECURITY.md](SECURITY.md) for sensitive reports.
+
+## Release notes
+
+Project changes are tracked in [CHANGELOG.md](CHANGELOG.md). A lightweight release process
+checklist is available in [Docs/release-checklist.md](Docs/release-checklist.md). Published
+GitHub releases live at <https://github.com/ndrco/Sure-Smartie-Linux/releases>.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
 - temporarily pauses the running `sure-smartie-linux.service` with `SIGSTOP/SIGCONT`
   to avoid racing the display while the hook talks to the serial device
 

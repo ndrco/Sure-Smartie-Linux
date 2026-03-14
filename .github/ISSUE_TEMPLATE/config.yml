@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/ndrco/Sure-Smartie-Linux#readme
+    about: Read the project overview, build instructions, and install notes.
+  - name: Releases
+    url: https://github.com/ndrco/Sure-Smartie-Linux/releases
+    about: Check release notes and packaged publication history.
