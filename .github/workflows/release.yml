@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            g++ \
+            pkg-config \
+            qt6-base-dev \
+            libgl1-mesa-dev
+
+      - name: Build release assets
+        run: ./scripts/package-release.sh "${{ github.ref_name }}"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: Docs/releases/${{ github.ref_name }}.md
+          files: |
+            dist/Sure-Smartie-Linux-${{ github.ref_name }}-linux-*.tar.gz
+            dist/Sure-Smartie-Linux-${{ github.ref_name }}-SHA256SUMS.txt
+          fail_on_unmatched_files: true
+          overwrite_files: true
