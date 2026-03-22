@@ -229,6 +229,52 @@ bool screenUsesBarGlyphs(const core::ScreenDefinition& screen) {
   return false;
 }
 
+bool endsWith(std::string_view value, std::string_view suffix) {
+  return value.size() >= suffix.size() &&
+         value.substr(value.size() - suffix.size()) == suffix;
+}
+
+std::string shortPathLabel(std::string_view value) {
+  if (value.empty()) {
+    return "-";
+  }
+  if (value == "/") {
+    return "/";
+  }
+
+  while (value.size() > 1 && value.back() == '/') {
+    value.remove_suffix(1);
+  }
+
+  const auto last_slash = value.find_last_of('/');
+  if (last_slash == std::string_view::npos || last_slash + 1 >= value.size()) {
+    return std::string(value);
+  }
+
+  return std::string(value.substr(last_slash + 1));
+}
+
+std::optional<std::string> resolveMetricValue(std::string_view key,
+                                              const core::MetricMap& metrics) {
+  if (const auto direct = metrics.find(std::string(key)); direct != metrics.end()) {
+    return direct->second;
+  }
+
+  if (!endsWith(key, "_short")) {
+    return std::nullopt;
+  }
+  if (!endsWith(key, ".device_short") && !endsWith(key, ".mount_short")) {
+    return std::nullopt;
+  }
+
+  std::string full_key(key.substr(0, key.size() - std::string_view("_short").size()));
+  if (const auto full = metrics.find(full_key); full != metrics.end()) {
+    return shortPathLabel(full->second);
+  }
+
+  return std::nullopt;
+}
+
 }  // namespace
 
 struct TemplateEngine::RenderContext {
@@ -376,8 +422,12 @@ std::string TemplateEngine::renderLine(const std::string& line,
         output.append(token.text);
         break;
       case TokenKind::metric: {
-        const auto metric = metrics.find(token.text);
-        output.append(metric != metrics.end() ? metric->second : "-");
+        if (const auto resolved = resolveMetricValue(token.text, metrics);
+            resolved.has_value()) {
+          output.append(*resolved);
+        } else {
+          output.append("-");
+        }
         break;
       }
       case TokenKind::bar:
@@ -395,6 +445,8 @@ std::string TemplateEngine::renderLine(const std::string& line,
           const auto target = token.column - 1;
           if (output.size() < target) {
             output.resize(target, ' ');
+          } else if (output.size() > target) {
+            output.resize(target);
           }
         }
         break;

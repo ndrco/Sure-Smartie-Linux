@@ -58,6 +58,30 @@ int main() {
   assert(aligned_frame.size() == 1);
   assert(aligned_frame[0] == "CPU 42%    73%      ");
 
+  sure_smartie::core::ScreenDefinition forced_column_screen{
+      .name = "forced-column",
+      .interval = std::chrono::milliseconds{5},
+      .lines = {"ABCDEFGHIJ{at:4}X"},
+  };
+  const auto forced_column_frame =
+      engine.render(forced_column_screen, metrics, {.cols = 12, .rows = 1});
+  assert(forced_column_frame.size() == 1);
+  assert(forced_column_frame[0] == "ABCX        ");
+
+  sure_smartie::core::MetricMap short_fallback_metrics{
+      {"disk.1.device", "/dev/nvme3n1p2"},
+      {"disk.1.mount", "/mnt/timeshift"},
+  };
+  sure_smartie::core::ScreenDefinition short_fallback_screen{
+      .name = "short-fallback",
+      .interval = std::chrono::milliseconds{5},
+      .lines = {"{disk.1.device_short} {disk.1.mount_short}"},
+  };
+  const auto short_fallback_frame =
+      engine.render(short_fallback_screen, short_fallback_metrics, {.cols = 20, .rows = 1});
+  assert(short_fallback_frame.size() == 1);
+  assert(short_fallback_frame[0] == "nvme3n1p2 timeshift ");
+
   const std::vector<sure_smartie::core::CustomGlyphDefinition> custom_glyphs{
       sure_smartie::core::CustomGlyphDefinition{
           .name = "heart",
