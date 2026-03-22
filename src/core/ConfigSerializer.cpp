@@ -13,6 +13,9 @@ nlohmann::json toJson(const AppConfig& config) {
   document["device"] = config.device;
   document["baudrate"] = config.baudrate;
   document["refresh_ms"] = config.refresh_interval.count();
+  document["screen_rotation"] = {
+      {"enabled", config.auto_screen_rotation},
+  };
   document["display"] = {
       {"type", config.display.type},
       {"cols", config.display.cols},

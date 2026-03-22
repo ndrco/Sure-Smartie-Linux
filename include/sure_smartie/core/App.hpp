@@ -21,6 +21,9 @@ class App {
  private:
   MetricMap collectMetrics();
   void renderOnce();
+  void setupScreenControlSocket();
+  void processScreenControlCommands(std::chrono::steady_clock::time_point now);
+  void teardownScreenControlSocket();
   void shutdownDisplay();
 
   AppConfig config_;
@@ -30,6 +33,8 @@ class App {
   engine::TemplateEngine template_engine_;
   engine::ScreenManager screen_manager_;
   std::atomic_bool stop_requested_{false};
+  int screen_control_socket_fd_{-1};
+  std::filesystem::path screen_control_socket_path_;
 };
 
 }  // namespace sure_smartie::core

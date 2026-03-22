@@ -109,5 +109,23 @@ int main() {
   assert(manager.current(start).name == "first");
   assert(manager.current(start + std::chrono::milliseconds{120}).name == "second");
 
+  sure_smartie::engine::ScreenManager manual_manager({first, second}, false);
+  const auto manual_start = std::chrono::steady_clock::now();
+  assert(manual_manager.current(manual_start).name == "first");
+  assert(manual_manager.current(manual_start + std::chrono::milliseconds{120}).name ==
+         "first");
+  assert(manual_manager.setCurrentScreen("2", manual_start));
+  assert(manual_manager.current(manual_start + std::chrono::milliseconds{200}).name ==
+         "second");
+  assert(manual_manager.setCurrentScreen("first", manual_start));
+  assert(manual_manager.current(manual_start + std::chrono::milliseconds{220}).name ==
+         "first");
+  assert(manual_manager.setCurrentScreen("index:1", manual_start));
+  assert(manual_manager.currentIndex() == 1);
+  assert(manual_manager.setCurrentScreen("next", manual_start));
+  assert(manual_manager.currentIndex() == 0);
+  assert(!manual_manager.setCurrentScreen("99", manual_start));
+  assert(!manual_manager.setCurrentScreen("missing", manual_start));
+
   return 0;
 }

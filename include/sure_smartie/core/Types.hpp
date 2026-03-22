@@ -4,6 +4,8 @@
 #include <array>
 #include <chrono>
 #include <cstddef>
+#include <filesystem>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -91,6 +93,7 @@ struct AppConfig {
   std::string device{"/dev/ttyUSB1"};
   int baudrate{9600};
   std::chrono::milliseconds refresh_interval{1000};
+  bool auto_screen_rotation{true};
   DisplayConfig display;
   CpuFanConfig cpu_fan;
   std::vector<std::string> providers{"cpu", "gpu", "ram", "system", "network"};
@@ -103,6 +106,9 @@ struct RuntimeOptions {
   bool once{false};
   bool force_stdout_display{false};
   bool validate_config_only{false};
+  bool auto_screen_rotation{true};
+  std::optional<std::string> initial_screen_selector;
+  std::filesystem::path screen_control_socket_path;
 };
 
 }  // namespace sure_smartie::core

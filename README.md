@@ -19,7 +19,7 @@ Repository: <https://github.com/ndrco/Sure-Smartie-Linux>
 - configurable CLI runtime and optional Qt6 GUI editor
 - built-in CPU, GPU, RAM, system, and network providers
 - install scripts, systemd units, sysusers, and Polkit integration
-- plugin SDK and sample runtime-loadable provider plugin
+- plugin SDK and runtime-loadable provider plugins
 
 ## Maintainer
 
@@ -34,7 +34,7 @@ This repository now contains the phase 1 baseline:
 - `IDisplay` abstraction with `sure` and `stdout` implementations
 - serial layer on top of POSIX `termios`
 - built-in providers for CPU, GPU, RAM, system and network metrics
-- template engine and screen rotation
+- template engine, screen rotation, and manual screen switch commands
 - JSON configuration loading
 
 Phase 2 extends that baseline with:
@@ -280,6 +280,50 @@ Apply a direct backlight command without starting the render loop:
 ./build/sure-smartie-linux --config configs/sure-example.json --backlight on
 ```
 
+Run in manual screen mode (automatic rotation disabled):
+
+```bash
+./build/sure-smartie-linux \
+  --config configs/sure-example.json \
+  --no-screen-rotation
+```
+
+If `--screen-control-socket` is not specified, the runtime resolves it in this order:
+
+1. `SURE_SMARTIE_SCREEN_CONTROL_SOCKET`
+2. `SURE_SMARTIE_SCREEN_COMMAND_FILE` (legacy alias)
+3. `/run/sure-smartie-linux/control.sock`
+
+Both service and CLI should use the same socket path. By default this is already true for
+system installs (`/run/sure-smartie-linux/control.sock`), so screen switching from CLI works
+without extra `/tmp` or shell env setup.
+
+Send a screen switch command from CLI to the running process:
+
+```bash
+./build/sure-smartie-linux --set-screen 2
+./build/sure-smartie-linux --set-screen cpu_gpu
+./build/sure-smartie-linux --set-screen index:0
+./build/sure-smartie-linux --set-screen next
+```
+
+Custom socket path (optional):
+
+```bash
+./build/sure-smartie-linux --set-screen next --screen-control-socket /run/sure-smartie-linux/control.sock
+```
+
+Render a specific screen once in manual mode:
+
+```bash
+./build/sure-smartie-linux \
+  --config configs/sure-example.json \
+  --stdout \
+  --once \
+  --no-screen-rotation \
+  --screen 2
+```
+
 Override the serial device at runtime:
 
 ```bash
@@ -422,6 +466,9 @@ level=info component=app msg="entering render loop" refresh_ms="1000" providers=
   "device": "/dev/ttyUSB1",
   "baudrate": 9600,
   "refresh_ms": 1000,
+  "screen_rotation": {
+    "enabled": true
+  },
   "display": {
     "type": "sure",
     "cols": 20,
@@ -454,6 +501,9 @@ level=info component=app msg="entering render loop" refresh_ms="1000" providers=
 If your motherboard exposes the CPU fan through sysfs, set `cpu_fan.rpm_path` to that
 exact file and `cpu_fan.max_rpm` to the known fan maximum. `cpu.fan_rpm` is read directly
 from that path, and `cpu.fan_percent` is derived from `max_rpm`.
+
+`screen_rotation.enabled` controls automatic screen rotation in runtime. Set it to `false`
+to keep one screen active and switch it manually with `--set-screen ...`.
 
 ## Notes about the SURE protocol
 
@@ -515,6 +565,7 @@ Detailed Russian guide for GUI-based configuration, screen design, built-in prov
 and plugin development:
 
 - [Docs/sure-smartie-gui-guide.md](Docs/sure-smartie-gui-guide.md)
+- [Docs/sure-smartie-disk-plugin.md](Docs/sure-smartie-disk-plugin.md)
 
 ## Plugin SDK
 

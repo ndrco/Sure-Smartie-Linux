@@ -6,6 +6,8 @@ After=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=-@SURE_SMARTIE_ENV_FILE@
+RuntimeDirectory=sure-smartie-linux
+RuntimeDirectoryMode=0755
 StateDirectory=sure-smartie-linux
 LogsDirectory=sure-smartie-linux
 WorkingDirectory=/var/lib/sure-smartie-linux

@@ -256,13 +256,32 @@ target_compile_options(
 )
 set_target_properties(sure_smartie_demo_plugin PROPERTIES PREFIX "")
 
+add_library(
+  sure_smartie_disk_plugin
+  MODULE
+  plugins/sure_smartie_disk_plugin.cpp
+)
+target_include_directories(
+  sure_smartie_disk_plugin
+  PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_compile_options(
+  sure_smartie_disk_plugin
+  PRIVATE
+    -Wall
+    -Wextra
+    -Wpedantic
+)
+set_target_properties(sure_smartie_disk_plugin PROPERTIES PREFIX "")
+
 install(TARGETS sure-smartie-linux RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(
   TARGETS sure_smartie_plugin_sdk
   EXPORT SureSmartieLinuxPluginSDKTargets
 )
 install(
-  TARGETS sure_smartie_demo_plugin
+  TARGETS sure_smartie_demo_plugin sure_smartie_disk_plugin
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/sure-smartie-linux/plugins
 )
 install(

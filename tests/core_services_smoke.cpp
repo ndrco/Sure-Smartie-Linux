@@ -48,6 +48,7 @@ int main() {
   config.device = "/dev/null";
   config.baudrate = 115200;
   config.refresh_interval = 1500ms;
+  config.auto_screen_rotation = false;
   config.display.type = "stdout";
   config.display.cols = 20;
   config.display.rows = 4;
@@ -87,6 +88,7 @@ int main() {
   assert(loaded.device == config.device);
   assert(loaded.baudrate == config.baudrate);
   assert(loaded.refresh_interval == config.refresh_interval);
+  assert(loaded.auto_screen_rotation == config.auto_screen_rotation);
   assert(loaded.display.type == config.display.type);
   assert(loaded.display.cols == config.display.cols);
   assert(loaded.display.rows == config.display.rows);

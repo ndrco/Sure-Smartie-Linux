@@ -82,6 +82,7 @@ int main(int argc, char** argv) {
   auto* custom_glyph_name_edit = window.findChild<QLineEdit*>("customGlyphNameEdit");
   auto* cpu_fan_rpm_path_edit = window.findChild<QLineEdit*>("cpuFanRpmPathEdit");
   auto* cpu_fan_max_rpm_spin = window.findChild<QSpinBox*>("cpuFanMaxRpmSpin");
+  auto* runtime_rotation_check = window.findChild<QCheckBox*>("runtimeRotationCheck");
   assert(preview_combo != nullptr);
   assert(rotation_check != nullptr);
   assert(validation_list != nullptr);
@@ -94,6 +95,7 @@ int main(int argc, char** argv) {
   assert(custom_glyph_name_edit != nullptr);
   assert(cpu_fan_rpm_path_edit != nullptr);
   assert(cpu_fan_max_rpm_spin != nullptr);
+  assert(runtime_rotation_check != nullptr);
   assert(preview_combo->isEnabled());
   assert(validation_list->count() >= 1);
   assert(!preview_status->text().isEmpty());
@@ -130,6 +132,7 @@ int main(int argc, char** argv) {
 
   cpu_fan_rpm_path_edit->setText("/sys/class/hwmon/hwmon9/fan3_input");
   cpu_fan_max_rpm_spin->setValue(1800);
+  runtime_rotation_check->setChecked(false);
   app.processEvents();
 
   window.setScreenLine(0, 0, "{glyph:heart} preview");
@@ -151,6 +154,7 @@ int main(int argc, char** argv) {
   assert(saved_config.custom_glyphs[0].pattern[0] == 0x18);
   assert(saved_config.cpu_fan.rpm_path == "/sys/class/hwmon/hwmon9/fan3_input");
   assert(saved_config.cpu_fan.max_rpm == 1800);
+  assert(!saved_config.auto_screen_rotation);
 
   rotation_check->setChecked(true);
   app.processEvents();

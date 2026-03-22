@@ -36,6 +36,13 @@ AppConfig ConfigLoader::loadFromFile(const std::filesystem::path& path) {
         std::chrono::milliseconds(document.at("refresh_ms").get<int>());
   }
 
+  if (document.contains("screen_rotation")) {
+    const auto& screen_rotation = document.at("screen_rotation");
+    if (screen_rotation.contains("enabled")) {
+      config.auto_screen_rotation = screen_rotation.at("enabled").get<bool>();
+    }
+  }
+
   if (document.contains("display")) {
     const auto& display = document.at("display");
     if (display.contains("type")) {

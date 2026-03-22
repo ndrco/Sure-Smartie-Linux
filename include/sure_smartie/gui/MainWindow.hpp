@@ -160,6 +160,7 @@ class MainWindow : public QMainWindow {
   QListWidget* screens_list_{nullptr};
   QLineEdit* screen_name_edit_{nullptr};
   QSpinBox* screen_interval_spin_{nullptr};
+  QCheckBox* runtime_rotation_check_{nullptr};
   QVBoxLayout* lines_layout_{nullptr};
   std::vector<QLineEdit*> line_edits_;
   std::vector<QLabel*> line_length_labels_;

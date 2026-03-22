@@ -116,6 +116,94 @@ sudo sure-smartie-uninstall
 ./build/sure-smartie-linux --config path/to/config.json --once
 ```
 
+### 3.1 CLI: ручной выбор экрана при отключённой ротации
+
+Если нужно управлять экраном вручную, можно отключить автоматическую ротацию:
+
+```bash
+./build/sure-smartie-linux \
+  --config path/to/config.json \
+  --no-screen-rotation
+```
+
+Для команд управления экраном используется Unix-сокет. Если `--screen-control-socket` не задан,
+путь выбирается в таком порядке:
+
+1. `SURE_SMARTIE_SCREEN_CONTROL_SOCKET`;
+2. `SURE_SMARTIE_SCREEN_COMMAND_FILE` (legacy alias);
+3. `/run/sure-smartie-linux/control.sock`.
+
+В установленном systemd-режиме этот путь уже общий для сервиса и CLI, поэтому переключение
+через `--set-screen ...` работает без `sudo` и без `/tmp`-файлов.
+
+После этого экран переключается отдельной CLI-командой:
+
+```bash
+./build/sure-smartie-linux --set-screen 2
+./build/sure-smartie-linux --set-screen cpu_gpu
+./build/sure-smartie-linux --set-screen index:0
+./build/sure-smartie-linux --set-screen next
+```
+
+Где селектор экрана:
+
+- `2` — второй экран (индексация с 1);
+- `cpu_gpu` — экран по имени;
+- `index:0` — явный индекс с 0;
+- `next` — следующий экран по кругу.
+
+При необходимости можно указать нестандартный путь к сокету:
+
+```bash
+./build/sure-smartie-linux --set-screen next --screen-control-socket /run/sure-smartie-linux/control.sock
+```
+
+`--screen-command-file` оставлен как обратная совместимость и работает как alias для
+`--screen-control-socket`.
+
+Можно также выбрать стартовый экран без ротации:
+
+```bash
+./build/sure-smartie-linux \
+  --config path/to/config.json \
+  --no-screen-rotation \
+  --screen 2
+```
+
+### 3.2 Очистка после экспериментов с `/tmp` и переменными окружения
+
+Если раньше использовались file-based сценарии (`/tmp/sure-smartie-screen.command`,
+`SURE_SMARTIE_SCREEN_COMMAND_FILE`), имеет смысл вернуть систему к дефолтам.
+
+1. Очистить переменные в текущей shell-сессии:
+
+```bash
+unset SURE_SMARTIE_SCREEN_COMMAND_FILE
+unset SURE_SMARTIE_SCREEN_CONTROL_SOCKET
+```
+
+2. Удалить старые строки из shell-профилей (`~/.bashrc`, `~/.profile`, `~/.zshrc`) при наличии.
+
+3. Проверить `/usr/local/etc/default/sure-smartie-linux` и убрать старые override-строки
+для `SURE_SMARTIE_SCREEN_COMMAND_FILE` или `SURE_SMARTIE_SCREEN_CONTROL_SOCKET`, если они больше
+не нужны.
+
+4. Удалить временные файлы от экспериментов:
+
+```bash
+rm -f /tmp/sure-smartie-screen.command
+rm -f /tmp/sure-smartie-*.sock
+```
+
+5. Применить изменения окружения сервиса:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart sure-smartie-linux-root.service
+```
+
+Если используется не root-unit, заменить имя сервиса на `sure-smartie-linux.service`.
+
 ### 4. Рекомендуемый systemd-режим для `cpu.power_w`
 
 Если на вашей системе файл Intel RAPL `energy_uj` читается только root, безопаснее не
@@ -228,6 +316,7 @@ SURE_SMARTIE_SERVICE_NAME=sure-smartie-linux-root.service
 
 - `Name`: человекочитаемое имя;
 - `Interval ms`: сколько экран показывается перед переключением;
+- `Auto rotation`: включение/отключение автоматической ротации экранов в рантайме;
 - `Lines`: шаблоны строк дисплея.
 
 Кнопки:
@@ -237,11 +326,20 @@ SURE_SMARTIE_SERVICE_NAME=sure-smartie-linux-root.service
 - `Duplicate`: скопировать экран;
 - `Move Up`, `Move Down`: поменять порядок ротации.
 
+Чтобы отключить автоматическую ротацию в рантайме, снять `Auto rotation` в этом же блоке.
+После сохранения в JSON появится:
+
+```json
+"screen_rotation": { "enabled": false }
+```
+
 Рекомендации:
 
 - делать экран под одну задачу: производительность, сеть, время, статус сервиса;
 - не перегружать одну строку метриками, потому что всё будет жёстко обрезано по ширине;
 - использовать preview line counters `est x/20`, чтобы не терять данные на усечении.
+- если планируется ручной выбор экрана через CLI (`--no-screen-rotation`), имена экранов
+  лучше делать короткими и уникальными.
 
 ### Preview
 
@@ -614,6 +712,10 @@ COUNT 42
 14:37
 workstation
 ```
+
+Для дискового плагина (емкость/занято по всем смонтированным дискам) есть отдельная инструкция:
+
+- `Docs/sure-smartie-disk-plugin.md`
 
 ## Полный перечень возможностей встроенных провайдеров
 
@@ -1022,6 +1124,9 @@ LCD маленький, поэтому метрики должны быть го
   "device": "/dev/ttyUSB1",
   "baudrate": 9600,
   "refresh_ms": 1000,
+  "screen_rotation": {
+    "enabled": true
+  },
   "display": {
     "type": "sure",
     "cols": 20,

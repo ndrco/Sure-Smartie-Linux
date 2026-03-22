@@ -634,8 +634,11 @@ void MainWindow::buildUi() {
   screen_name_edit_ = new QLineEdit(screens_group);
   screen_interval_spin_ = new QSpinBox(screens_group);
   screen_interval_spin_->setRange(-1000000, 600000);
+  runtime_rotation_check_ = new QCheckBox("Enabled", screens_group);
+  runtime_rotation_check_->setObjectName("runtimeRotationCheck");
   screen_form->addRow("Name", screen_name_edit_);
   screen_form->addRow("Interval ms", screen_interval_spin_);
+  screen_form->addRow("Auto rotation", runtime_rotation_check_);
   screen_editor_column->addLayout(screen_form);
   auto* lines_group = new QGroupBox("Lines", screens_group);
   lines_layout_ = new QVBoxLayout(lines_group);
@@ -976,6 +979,14 @@ void MainWindow::buildUi() {
                 std::chrono::milliseconds(value);
             markConfigEdited(false, false, true);
           });
+
+  connect(runtime_rotation_check_, &QCheckBox::toggled, this, [this](bool checked) {
+    if (updating_ui_) {
+      return;
+    }
+    config_.auto_screen_rotation = checked;
+    markConfigEdited(false, false, false);
+  });
 
   connect(add_screen_button, &QPushButton::clicked, this, [this]() { addScreen(); });
   connect(remove_screen_button, &QPushButton::clicked, this, [this]() {
@@ -1539,6 +1550,8 @@ void MainWindow::syncCustomGlyphSectionFromConfig() {
 }
 
 void MainWindow::syncScreensSectionFromConfig() {
+  runtime_rotation_check_->setChecked(config_.auto_screen_rotation);
+
   int selected_index = selectedScreenIndex();
   if (selected_index < 0 && !config_.screens.empty()) {
     selected_index = 0;
