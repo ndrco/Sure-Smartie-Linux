@@ -19,3 +19,9 @@ The format can stay lightweight. A simple list per release is enough.
 - Added `fstab` cache by `mtime` and disk usage cache with 5-second TTL
 - Improved `{at:column}` macro to support forced backward cursor positioning
 - Improved template rendering fallback for `_short` disk metrics in GUI preview
+
+## v0.1.2
+
+- Fixed `sure_smartie_disk_plugin` handling for `autofs` placeholders (`device=systemd-1`, `fs=autofs`)
+- Prevented expensive/blocking `statvfs()` calls on autofs placeholder entries
+- Preferred real filesystem mount entries over autofs placeholders for the same mountpoint

@@ -69,6 +69,10 @@ bool startsWith(std::string_view value, std::string_view prefix) {
   return value.size() >= prefix.size() && value.substr(0, prefix.size()) == prefix;
 }
 
+bool isAutomountPlaceholder(const MountEntry& entry) {
+  return entry.fs_type == "autofs" || entry.device == "systemd-1";
+}
+
 bool isTrackedMountPoint(std::string_view mount_point) {
   return mount_point == "/" || mount_point == "/mnt" || startsWith(mount_point, "/mnt/");
 }
@@ -165,7 +169,6 @@ std::unordered_map<std::string, MountEntry> readMountedDisks() {
   }
 
   std::unordered_map<std::string, MountEntry> entries;
-  std::set<std::string> seen_mount_points;
   std::string line;
 
   while (std::getline(mounts, line)) {
@@ -185,15 +188,24 @@ std::unordered_map<std::string, MountEntry> readMountedDisks() {
     const std::string device = decodeMountField(raw_device);
     const std::string mount_point = decodeMountField(raw_mount_point);
 
-    if (!seen_mount_points.insert(mount_point).second) {
+    MountEntry candidate{
+        .device = normalizeOrMissing(device),
+        .mount_point = mount_point,
+        .fs_type = normalizeOrMissing(fs_type),
+    };
+
+    const auto existing = entries.find(mount_point);
+    if (existing == entries.end()) {
+      entries.emplace(mount_point, std::move(candidate));
       continue;
     }
 
-    entries.emplace(mount_point, MountEntry{
-                                    .device = normalizeOrMissing(device),
-                                    .mount_point = mount_point,
-                                    .fs_type = normalizeOrMissing(fs_type),
-                                });
+    // systemd automount points may appear as "autofs" first, then as a real filesystem.
+    // Prefer the real filesystem entry so we do not probe the autofs placeholder.
+    if (isAutomountPlaceholder(existing->second) &&
+        !isAutomountPlaceholder(candidate)) {
+      existing->second = std::move(candidate);
+    }
   }
 
   return entries;
@@ -214,6 +226,12 @@ std::vector<DiskUsage> collectDiskUsage(
     }
 
     disk.mount = mounted->second;
+    if (isAutomountPlaceholder(disk.mount)) {
+      // Avoid triggering expensive/blocking automount resolution from statvfs().
+      disks.push_back(std::move(disk));
+      continue;
+    }
+
     struct statvfs stat {
     };
     if (::statvfs(disk.mount.mount_point.c_str(), &stat) != 0) {
